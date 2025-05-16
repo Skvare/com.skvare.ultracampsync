@@ -17,10 +17,7 @@ class CRM_Ultracampsync_Utils {
    * @throws CRM_Core_Exception
    */
   public static function handleContact($contactParams = [], $cfPersonId = NULL, $cfAccountId = NULL) {
-    CRM_Core_Error::debug_var('handleContact $cfPersonId', $cfPersonId);
-    CRM_Core_Error::debug_var('handleContact $cfAccountId', $cfAccountId);
     $personId = $contactParams['PersonId'];
-    CRM_Core_Error::debug_var('handleContact $personId', $personId);
     $contactID = NULL;
     if (!empty($cfAccountId)) {
       $contactResult = civicrm_api3('Contact', 'get', [
@@ -31,7 +28,6 @@ class CRM_Ultracampsync_Utils {
       if ($contactResult['id']) {
         $contactID = $contactResult['id'];
       }
-      CRM_Core_Error::debug_var('handleContact 1 $contactID', $contactID);
     }
     if (empty($contactID)) {
       $get_params = [
@@ -42,7 +38,6 @@ class CRM_Ultracampsync_Utils {
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if (!empty($contactResult['id'])) {
         $contactID = $contactResult['id'];
-        CRM_Core_Error::debug_var('handleContact 2 $contactID', $contactID);
       }
     }
 
@@ -63,7 +58,6 @@ class CRM_Ultracampsync_Utils {
     if (!empty($cfAccountId) && !empty($contactParams['AccountId'])) {
       $newContactParam['custom_' . $cfAccountId] = $contactParams['AccountId'];
     }
-    CRM_Core_Error::debug_var('handleContact $newContactParam', $newContactParam);
     try {
       $contactCreateResult = civicrm_api3('Contact', 'create', $newContactParam);
       if (!empty($contactCreateResult['id'])) {
@@ -101,7 +95,6 @@ class CRM_Ultracampsync_Utils {
         'state_province_id' => $addressParams['PersonStateID'],
         'postal_code' => $addressParams['PersonZip'],
       ];
-      CRM_Core_Error::debug_var('handleAddress $address_params', $address_params);
       $civi_address = civicrm_api3('Address', 'create', $address_params);
     }
     catch (CRM_Core_Exception $e) {
@@ -109,11 +102,12 @@ class CRM_Ultracampsync_Utils {
     }
   }
 
-  public static function handleParticipant($parcipantParams = []) {
+  public static function handleParticipant($parcipantParams = [], $reservation_id_field) {
     // check if participants already exists.
     $params = [
       'contact_id' => $parcipantParams['contact_id'],
       'event_id' => $parcipantParams['event_id'],
+      'custom_' . $reservation_id_field => $parcipantParams['ReservationId'],
     ];
 
     $resultParticipant = civicrm_api3('Participant', 'get', $params);
@@ -124,8 +118,10 @@ class CRM_Ultracampsync_Utils {
     $params['status_id'] = 1;  // 5 = pending from pay later, 1 = registered
     $params['role_id'] = 1; // 1 = attendee
     $params['source'] = 'Ultracamp Sync';
+    if (!empty($reservation_id_field)) {
+      $params['custom_' . $reservation_id_field] = $parcipantParams['ReservationId'];
+    }
     $params['register_date'] = date("YmdHis", strtotime($parcipantParams['OrderDate']));
-    CRM_Core_Error::debug_var('Participant create $params', $params);
     try {
       $participant = civicrm_api3('Participant', 'create', $params);
       if (!empty($participant['id']) && !empty($parcipantParams['id'])) {

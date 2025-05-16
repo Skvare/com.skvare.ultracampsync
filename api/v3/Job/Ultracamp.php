@@ -10,6 +10,25 @@ use CRM_Ultracampsync_ExtensionUtil as E;
  * @see https://docs.civicrm.org/dev/en/latest/framework/api-architecture/
  */
 function _civicrm_api3_job_Ultracamp_spec(&$spec) {
+  $spec['last_modified_date_from'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'last_modified_date_from',
+    'title' => 'Last Modified Date From',
+    //'api.default' => 'previous.day',
+  ];
+
+  $spec['order_date_from'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'order_date_from',
+    'title' => 'Order Date From',
+    //'api.default' => 'previous.day',
+  ];
+
+  $spec['session_id'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'session_id',
+    'title' => 'Session ID',
+  ];
 }
 
 /**
@@ -26,6 +45,35 @@ function _civicrm_api3_job_Ultracamp_spec(&$spec) {
  * @throws API_Exception
  */
 function civicrm_api3_job_Ultracamp($params) {
+  // validate the period value.
+  $relativeDateLastModifiedDateFrom = explode('.', $params['last_modified_date_from'], 2);
+  if (count($relativeDateLastModifiedDateFrom) == 2) {
+    // convert relative date to actual date.
+    [$dateLastModifiedDateFrom, $to] = CRM_Utils_Date::getFromTo($params['last_modified_date_from'], '', '');
+    if (empty($dateLastModifiedDateFrom)) {
+      throw new API_Exception('Invalid relative date format A', 'last_modified_date_from');
+    }
+  }
+  else {
+    $dateLastModifiedDateFrom = CRM_Utils_Array::value('last_modified_date_from', $params);
+  }
+
+  $relativeOrderDateFrom = explode('.', $params['order_date_from'], 2);
+  if (count($relativeOrderDateFrom) == 2) {
+    // convert relative date to actual date.
+    [$dateOrderDateFrom, $to] = CRM_Utils_Date::getFromTo($params['order_date_from'], '', '');
+    if (empty($dateOrderDateFrom)) {
+      throw new API_Exception('Invalid relative date format', 'order_date_from');
+    }
+  }
+  else {
+    $dateOrderDateFrom = CRM_Utils_Array::value('order_date_from', $params);
+  }
+
+  if (empty($dateLastModifiedDateFrom) && empty($dateOrderDateFrom)) {
+    return civicrm_api3_create_error('Last modified date or Order Date From date is required.');
+  }
+
   // Check if API credentials are configured
   $campId = Civi::settings()->get('ultracampsync_camp_id');
   $campApiKey = Civi::settings()->get('ultracampsync_camp_api_key');
@@ -37,7 +85,12 @@ function civicrm_api3_job_Ultracamp($params) {
   // Initialize UltraCamp client
   try {
     $client = new CRM_UltracampSync_API_UltracampClient();
-    $params['lastModifiedDateFrom'] = '20250101';
+    if (!empty($dateLastModifiedDateFrom)) {
+      $params['lastModifiedDateFrom'] = $dateLastModifiedDateFrom;
+    }
+    if (!empty($dateOrderDateFrom)) {
+      $params['orderDateFrom'] = $dateOrderDateFrom;
+    }
 
     $result = $client->getReservationDetails($params);
     $i = 0;
@@ -51,9 +104,9 @@ function civicrm_api3_job_Ultracamp($params) {
       }
       $i++;
       $rowsImported++;
-      // CRM_Core_Error::debug_var('$value', $value);
       $values = [];
       $values['account_id'] = $value['AccountId'];
+      $values['reservation_id'] = $value['ReservationId'];
       $values['person_id'] = $value['PersonId'];
       $values['session_id'] = $value['SessionId'];
       $values['session_name'] = $value['SessionName'];
@@ -81,8 +134,8 @@ function civicrm_api3_job_Ultracamp($params) {
  *   Contact Details.
  */
 function _insert_to_ultracamp_table(array $params = []) {
-  $query = "INSERT INTO civicrm_ultracamp (account_id,person_id,session_id,session_name,order_date,status,data)
-    VALUES (%1, %2, %3, %4, %5, %6, %7)";
+  $query = "INSERT INTO civicrm_ultracamp (account_id,person_id,session_id,session_name,order_date,status,data,reservation_id)
+    VALUES (%1, %2, %3, %4, %5, %6, %7, %8)";
   $inputValueTypes = [
     1 => [$params['account_id'], 'String'],
     2 => [$params['person_id'] ?? '', 'String'],
@@ -91,11 +144,12 @@ function _insert_to_ultracamp_table(array $params = []) {
     5 => [$params['order_date'] ?? '', 'String'],
     6 => ['new', 'String'],
     7 => [$params['data'] ?? '', 'String'],
+    8 => [$params['reservation_id'] ?? '', 'String'],
   ];
   try {
     CRM_Core_DAO::executeQuery($query, $inputValueTypes);
   }
   catch (CiviCRM_API3_Exception $exception) {
-    CRM_Core_Error::debug_var('Error _insert_to_gambit_table', $exception->getMessage());
+    CRM_Core_Error::debug_var('Error _insert_to_ultracamp_table', $exception->getMessage());
   }
 }

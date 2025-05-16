@@ -17,6 +17,7 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
    */
   public function install(): void {
     $this->installCustomGroupForEvent();
+    $this->installCustomGroupForParticipant();
   }
 
   public function installCustomGroupForEvent(): void {
@@ -97,6 +98,58 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
     catch (Exception $e) {
       CRM_Core_Error::debug_log_message('Failed to create custom fields: ' . $e->getMessage());
     }
+  }
+  /**
+   * Example: Create custom group and fields for participant.
+   *
+   * @return void
+   */
+  public function installCustomGroupForParticipant(): void {
+    try {
+      // Create custom group for Ultracamp data
+      $customGroup = civicrm_api3('CustomGroup', 'create', [
+        'title' => "Ultracamp Participant",
+        'extends' => "Participant",
+        'is_active' => 1,
+        'is_reserved' => 0,
+        'name' => "ultracamp_participant",
+        'is_public' => 1,
+      ]);
+      $customGroupId = $customGroup['id'];
+    }
+    catch (Exception $e) {
+      // If an exception is thrown, most likely the option group already exists,
+      // in which case we'll just use that one.
+      $customGroupId = civicrm_api3('CustomGroup', 'getvalue', [
+        'name' => 'ultracamp_participant',
+        'return' => 'id',
+      ]);
+    }
+
+    try {
+      // Create custom field for Ultracamp session ID
+      civicrm_api3('CustomField', 'create', [
+        'custom_group_id' => $customGroupId,
+        'label' => "Ultracamp Reservation ID",
+        'name' => "ultracamp_reservation_idd",
+        'data_type' => "String",
+        'html_type' => "Text",
+        'is_active' => 1,
+        'is_searchable' => 1,
+        'is_view' => 0,
+        'is_required' => 0,
+        'weight' => 1,
+      ]);
+    }
+    catch (Exception $e) {
+      CRM_Core_Error::debug_log_message('Failed to create custom fields: ' . $e->getMessage());
+    }
+  }
+
+  public function upgrade_1001(): bool {
+    $this->ctx->log->info('Adding custom field for participant 1001');
+    $this->installCustomGroupForParticipant();
+    return TRUE;
   }
 
   /**

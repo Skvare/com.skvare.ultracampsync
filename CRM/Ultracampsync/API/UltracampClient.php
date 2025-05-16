@@ -92,7 +92,6 @@ class CRM_UltracampSync_API_UltracampClient {
     }
 
     $url .= $endpoint;
-    echo $url;
     $ch = curl_init($url);
 
     $headers = [
@@ -105,8 +104,6 @@ class CRM_UltracampSync_API_UltracampClient {
       $authorization = base64_encode("{$this->campId}:{$this->campApiKey}");
       $headers[] = "Authorization: Basic {$authorization}";
     }
-    echo '<pre>$this'; print_r($this); echo '</pre>';
-    echo '<pre>'; print_r($headers); echo '</pre>';
 
 
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);

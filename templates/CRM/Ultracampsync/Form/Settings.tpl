@@ -44,6 +44,14 @@
     <div class="clear"></div>
   </div>
 
+  <div class="crm-section">
+    <div class="label">{$form.reservation_id_field.label}</div>
+    <div class="content">{$form.reservation_id_field.html}
+      <div class="description">{ts}Custom Field for Reservation ID.{/ts}</div>
+    </div>
+    <div class="clear"></div>
+  </div>
+
 
   <div class="crm-submit-buttons">
     {include file="CRM/common/formButtons.tpl" location="bottom"}

@@ -36,6 +36,7 @@ SET FOREIGN_KEY_CHECKS=1;
 -- *******************************************************/
 CREATE TABLE `civicrm_ultracamp` (
   `id` int unsigned NOT NULL AUTO_INCREMENT COMMENT 'Unique Ultracamp ID',
+  `reservation_id` int unsigned COMMENT 'ReservationId',
   `contact_id` int unsigned COMMENT 'FK to Contact',
   `account_id` int unsigned COMMENT 'Account ID',
   `person_id` int unsigned COMMENT 'Person ID',
@@ -53,5 +54,6 @@ CREATE TABLE `civicrm_ultracamp` (
   INDEX `index_order_date`(order_date),
   INDEX `index_status`(status),
   CONSTRAINT FK_civicrm_ultracamp_contact_id FOREIGN KEY (`contact_id`) REFERENCES `civicrm_contact`(`id`) ON DELETE CASCADE,
-  CONSTRAINT FK_civicrm_ultracamp_manual_contact_id FOREIGN KEY (`manual_contact_id`) REFERENCES `civicrm_contact`(`id`) ON DELETE SET NULL)
+  CONSTRAINT FK_civicrm_ultracamp_manual_contact_id FOREIGN KEY (`manual_contact_id`) REFERENCES `civicrm_contact`(`id`) ON DELETE SET NULL,
+  CONSTRAINT FK_civicrm_ultracamp_participant_id FOREIGN KEY (`participant_id`) REFERENCES `civicrm_participant`(`id`) ON DELETE SET NULL)
 ENGINE=InnoDB;
