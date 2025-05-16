@@ -1,0 +1,176 @@
+<?xml version="1.0" encoding="iso-8859-1" ?>
+<table>
+  <base>CRM/Ultracampsync</base>
+  <class>Ultracamp</class>
+  <name>civicrm_ultracamp</name>
+  <comment>Ultracamp table</comment>
+  <log>false</log>
+  <field>
+    <name>id</name>
+    <type>int unsigned</type>
+    <required>true</required>
+    <comment>Unique Ultracamp ID</comment>
+    <html>
+      <type>Number</type>
+    </html>
+  </field>
+  <primaryKey>
+    <name>id</name>
+    <autoincrement>true</autoincrement>
+  </primaryKey>
+  <field>
+    <name>contact_id</name>
+    <title>Contact ID</title>
+    <type>int unsigned</type>
+    <comment>FK to Contact</comment>
+    <html>
+      <type>EntityRef</type>
+      <label>Contact</label>
+    </html>
+  </field>
+  <foreignKey>
+    <name>contact_id</name>
+    <table>civicrm_contact</table>
+    <key>id</key>
+    <onDelete>CASCADE</onDelete>
+  </foreignKey>
+  <field>
+    <name>account_id</name>
+    <title>Account ID</title>
+    <type>int unsigned</type>
+    <comment>Account ID</comment>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+  <field>
+    <name>person_id</name>
+    <title>Person ID</title>
+    <type>int unsigned</type>
+    <comment>Person ID</comment>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+  <index>
+    <name>index_person_id</name>
+    <fieldName>person_id</fieldName>
+    <add>1.0</add>
+  </index>
+  <field>
+    <name>session_id</name>
+    <title>Session ID</title>
+    <type>int unsigned</type>
+    <comment>Session ID</comment>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+  <field>
+    <name>session_name</name>
+    <title>Session Name</title>
+    <type>varchar</type>
+    <length>512</length>
+    <required>false</required>
+    <export>true</export>
+    <import>true</import>
+    <add>5.63</add>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+  <index>
+    <name>index_session_name</name>
+    <fieldName>session_name</fieldName>
+    <add>1.0</add>
+  </index>
+  <field>
+    <name>order_date</name>
+    <title>Order Date</title>
+    <type>datetime</type>
+    <import>true</import>
+    <headerPattern>/replace(.?date)?/i</headerPattern>
+    <dataPattern>/^\d{4}-?\d{2}-?\d{2} ?(\d{2}:?\d{2}:?(\d{2})?)?$/</dataPattern>
+    <html>
+      <type>Select Date</type>
+      <formatType>activityDateTime</formatType>
+    </html>
+  </field>
+  <index>
+    <name>index_order_date</name>
+    <fieldName>order_date</fieldName>
+    <add>1.0</add>
+  </index>
+  <field>
+    <name>status</name>
+    <title>Processing status</title>
+    <type>varchar</type>
+    <length>100</length>
+    <required>false</required>
+    <export>true</export>
+    <import>true</import>
+    <add>5.63</add>
+    <html>
+      <type>Select</type>
+    </html>
+    <pseudoconstant>
+      <callback>CRM_Ultracampsync_Utils::recordStatus</callback>
+    </pseudoconstant>
+  </field>
+  <index>
+    <name>index_status</name>
+    <fieldName>status</fieldName>
+    <add>1.0</add>
+  </index>
+  <field>
+    <name>message</name>
+    <title>Message</title>
+    <type>varchar</type>
+    <length>1024</length>
+    <required>false</required>
+    <export>true</export>
+    <import>true</import>
+    <add>5.63</add>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+  <field>
+    <name>data</name>
+    <title>Data</title>
+    <type>text</type>
+    <comment>Data.</comment>
+    <html>
+      <type>TextArea</type>
+      <rows>4</rows>
+      <cols>60</cols>
+    </html>
+    <import>true</import>
+    <add>5.63</add>
+  </field>
+  <field>
+    <name>manual_contact_id</name>
+    <title>Manually Assigned Contact ID</title>
+    <type>int unsigned</type>
+    <comment>FK to Contact</comment>
+    <html>
+      <type>EntityRef</type>
+      <label>Manually Assigned Contact</label>
+    </html>
+  </field>
+  <foreignKey>
+    <name>manual_contact_id</name>
+    <table>civicrm_contact</table>
+    <key>id</key>
+    <onDelete>SET NULL</onDelete>
+  </foreignKey>
+  <field>
+    <name>participant_id</name>
+    <title>Participant ID</title>
+    <type>int unsigned</type>
+    <comment>FK to Participant</comment>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
+</table>
