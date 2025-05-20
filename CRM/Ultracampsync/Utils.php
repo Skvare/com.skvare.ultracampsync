@@ -28,12 +28,14 @@ class CRM_Ultracampsync_Utils {
       if ($contactResult['id']) {
         $contactID = $contactResult['id'];
       }
+      return $contactID;
     }
+
     if (empty($contactID)) {
       $get_params = [
         'contact_type' => 'Individual',
-        'first_name' => $member['first-name'],
-        'last_name' => $member['last-name'],
+        'first_name' => $contactParams['first_name'],
+        'last_name' => $contactParams['last_name'],
       ];
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if (!empty($contactResult['id'])) {
@@ -71,6 +73,70 @@ class CRM_Ultracampsync_Utils {
     return $contactID;
   }
 
+  /**
+   * Handle household contact.
+   *
+   * @param $contactParams
+   * @param $cfAccountId
+   * @param $accountId
+   * @return mixed|null
+   * @throws CRM_Core_Exception
+   */
+  public static function handleHouseHoldContact($contactParams = [], $cfAccountId = NULL) {
+    $contactID = NULL;
+    if (!empty($cfAccountId)) {
+      $contactResult = civicrm_api3('Contact', 'get', [
+        'sequential' => 1,
+        'return' => ["id"],
+        'contact_type' => 'Household',
+        'custom_' . $cfAccountId => $contactParams['AccountId'],
+      ]);
+      if ($contactResult['id']) {
+        $contactID = $contactResult['id'];
+      }
+      return $contactID;
+    }
+
+    if (empty($contactID)) {
+      $get_params = [
+        'contact_type' => 'Household',
+        'household_name' => $contactParams['AccountName'],
+      ];
+      $contactResult = civicrm_api3('Contact', 'get', $get_params);
+      if (!empty($contactResult['id'])) {
+        $contactID = $contactResult['id'];
+      }
+    }
+
+    $newContactParam = [];
+    if (!empty($contactID)) {
+      $newContactParam['id'] = $contactID;
+    }
+    $newContactParam['contact_type'] = 'Household';
+    $newContactParam['household_name'] = $contactParams['AccountName'];
+    if (!empty($cfAccountId) && !empty($contactParams['AccountId'])) {
+      $newContactParam['custom_' . $cfAccountId] = $contactParams['AccountId'];
+    }
+    try {
+      $contactCreateResult = civicrm_api3('Contact', 'create', $newContactParam);
+      if (!empty($contactCreateResult['id'])) {
+        $contactID = $contactCreateResult['id'];
+      }
+    }
+    catch (CRM_Core_Exception $e) {
+      CRM_Core_Error::debug_log_message('Household: Error creating/updating contact: ' . $e->getMessage());
+    }
+
+    return $contactID;
+  }
+
+  /**
+   * Handle contact address.
+   *
+   * @param $addressParams
+   * @return void
+   * @throws CRM_Core_Exception
+   */
   public static function handleAddress($addressParams = []) {
     $id = $addressParams['contact_id'];
     $address_id = $id;
@@ -102,6 +168,14 @@ class CRM_Ultracampsync_Utils {
     }
   }
 
+  /**
+   * Handle Participant.
+   *
+   * @param $parcipantParams
+   * @param $reservation_id_field
+   * @return bool
+   * @throws CRM_Core_Exception
+   */
   public static function handleParticipant($parcipantParams = [], $reservation_id_field) {
     // check if participants already exists.
     $params = [
@@ -370,5 +444,122 @@ class CRM_Ultracampsync_Utils {
       'success' => E::ts('Success'),
       'processing' => E::ts('Processing'),
     ];
+  }
+
+  public static function getRelationshipTypeMapping() {
+    return [
+      'Daughter' => '34', // Child of
+      'Father/Husband' => '7',
+      'Granddaughter' => '39',
+      'Grandfather' => '35',
+      'Grandmother' => '35',
+      'Grandson' => '39',
+      'Individual Adult' => '',
+      'Mother/Wife' => '7',
+      'Nephew' => '36',
+      'Niece' => '36',
+      'Non-Family' => '38',
+      'Other Extended Family' => '41',
+      'Priest' => '',
+      'Religious' => '',
+      'Son' => '34',
+    ];
+  }
+
+
+  public static function getRelationshipType($people) {
+    $relationshipType = '';
+    if (!empty($people['CustomQuestions'])) {
+      foreach ($people['CustomQuestions'] as $customQuestion) {
+        if ($customQuestion['Name'] == 'Relationship') {
+          $relationshipType = $customQuestion['Answer'];
+          break;
+        }
+      }
+    }
+    return $relationshipType;
+  }
+
+  /**
+   * Handle relationship.
+   * Check Relationship record exist before creating new one.
+   *
+   * @param int $personContactID
+   * @param int $houseHoldContactID
+   * @param int $relationshipTypeId
+   */
+  public static function handleRelationship($personContactID, $houseHoldContactID, $relationshipTypeId) {
+    $params = [
+      'contact_id_a' => $personContactID,
+      'contact_id_b' => $houseHoldContactID,
+      'relationship_type_id' => $relationshipTypeId,
+    ];
+    $result = civicrm_api3('Relationship', 'get', $params);
+    if (empty($result['count'])) {
+      $params['relationship_type_id'] = $relationshipTypeId;
+      $params['contact_id_a'] = $personContactID;
+      $params['contact_id_b'] = $houseHoldContactID;
+      try {
+        civicrm_api3('Relationship', 'create', $params);
+      }
+      catch (CRM_Core_Exception $e) {
+        CRM_Core_Error::debug_log_message('Error creating relationship: ' . $e->getMessage());
+      }
+    }
+  }
+
+  /**
+   * Get Household name from people.
+   *
+   * @param array $peoples
+   * @return string
+   */
+  public static function getHouseHoldName($peoples) {
+    $primaryContact = [];
+    $secondoryContact = [];
+    $genderWiseContact = [];
+    $houseHoldName = '';
+    foreach ($peoples as $people) {
+      if (!empty($people['PrimaryContact'])) {
+        $primaryContact = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender'], 'peopleID' => $people['Id']];
+        $gender = $people['Gender'] ?? 'PrimaryGender';
+        $genderWiseContact[$gender] = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender']];
+      }
+      if (!empty($people['SecondaryContact'])) {
+        $secondoryContact = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender'], 'peopleID' => $people['Id']];
+        $gender = $people['Gender'] ?? 'secondoryGender';
+        $genderWiseContact[$gender] = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender']];
+      }
+    }
+
+    /*
+     if both primary and secondary contact present then generate householdname
+     Household name uses these fields in each Person record:
+
+    PrimaryContact (true/false): get this contact in an account. Should only be 1 per account.
+    SecondaryContact (true/false): get this contact in an account. Should only be 1 per account.,
+    Gender: get the gender of the PrimaryContact and SecondaryContact
+
+    Create household name: "[MALE LASTNAME], [MALE FNAME] & [FEMALE FNAME] Family"
+
+    If there is no secondary contact, then it is: "[PRIMARY LASTNAME], [PRIMARY FNAME] Family"
+    If the gender of Primary or Secondary contact is unknown or they're the same, then household name is: "[PRIMARYCONTACT LASTNAME], [PRIMARYCONTACT FNAME] & [SECONDARYCONTACT FNAME] Family"
+    */
+    if (!empty($primaryContact) && !empty($secondoryContact) &&
+      array_key_exists('Female', $genderWiseContact) && array_key_exists('Male', $genderWiseContact)) {
+      $houseHoldName = $genderWiseContact['Male']['last_name'] . ' ' .
+        $genderWiseContact['Male']['first_name'] . ' & ' .
+        $genderWiseContact['Female']['first_name'] . '  Family';
+    }
+    elseif (!empty($primaryContact) && !empty($secondoryContact) && count($genderWiseContact) == 1) {
+      $houseHoldName = $primaryContact['last_name'] . ' ' .
+        $primaryContact['first_name'] . ' & ' .
+        $secondoryContact['first_name'] . '  Family';
+    }
+    elseif (!empty($primaryContact) && empty($secondoryContact)) {
+      $houseHoldName = $primaryContact['last_name'] . ' ' .
+        $primaryContact['first_name'] . ' Family';
+    }
+    return $houseHoldName;
   }
 }

@@ -44,6 +44,40 @@ class CRM_UltracampSync_API_UltracampClient {
   }
 
   /**
+   * Get a  from UltraCamp
+   * @param array $params filter parameters.
+   * @return array people data
+   */
+  public function getPeoples($params = []) {
+    $endpoint = "/api/camps/{$this->campId}/people";
+    $queryParams = [];
+
+    if (!empty($params['accountNumber'])) {
+      $queryParams['accountNumber'] = $params['accountNumber'];
+    }
+    if (!empty($params['accountStatus'])) {
+      $queryParams['accountStatus'] = $params['accountStatus'];
+    }
+    if (!empty($params['accountType'])) {
+      $queryParams['accountType'] = $params['accountType'];
+    }
+    if (!empty($params['internalId'])) {
+      $queryParams['internalId'] = $params['internalId'];
+    }
+    if (!empty($params['lastUpdateStartDate'])) {
+      $queryParams['lastUpdateStartDate'] = $params['lastUpdateStartDate'];
+    }
+    if (!empty($params['lastUpdateStartDate'])) {
+      $queryParams['lastUpdateStartDate'] = $params['lastUpdateStartDate'];
+    }
+
+    if (!empty($queryParams)) {
+      $endpoint .= '?' . http_build_query($queryParams);
+    }
+    return $this->makeRequest($endpoint);
+  }
+
+  /**
    * Get all Reservation from UltraCamp
    *
    * @return array Reservation data

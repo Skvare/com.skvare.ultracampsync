@@ -29,6 +29,20 @@ function _civicrm_api3_job_Ultracamp_spec(&$spec) {
     'name' => 'session_id',
     'title' => 'Session ID',
   ];
+  $spec['delete_old'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'delete_old',
+    'title' => 'Delete old records after (default: -1 year)',
+    'api.default' => '-1 year',
+    'description' => 'Delete old records from database. Specify 0 to disable. Default is "-1 year"',
+  ];
+  $spec['use_last_sync_date'] = [
+    'type' => CRM_Utils_Type::T_BOOLEAN,
+    'name' => 'use_last_sync_date',
+    'title' => 'Use Last synd date',
+    'api.default' => FALSE,
+    'description' => 'Use last sync date to fetch records from UltraCamp',
+  ];
 }
 
 /**
@@ -51,7 +65,7 @@ function civicrm_api3_job_Ultracamp($params) {
     // convert relative date to actual date.
     [$dateLastModifiedDateFrom, $to] = CRM_Utils_Date::getFromTo($params['last_modified_date_from'], '', '');
     if (empty($dateLastModifiedDateFrom)) {
-      throw new API_Exception('Invalid relative date format A', 'last_modified_date_from');
+      throw new API_Exception('Invalid relative date format', 'last_modified_date_from');
     }
   }
   else {
@@ -73,6 +87,27 @@ function civicrm_api3_job_Ultracamp($params) {
   if (empty($dateLastModifiedDateFrom) && empty($dateOrderDateFrom)) {
     return civicrm_api3_create_error('Last modified date or Order Date From date is required.');
   }
+  $dateAvailable = [];
+  if (!empty($dateLastModifiedDateFrom)) {
+    $dateLastModifiedDateFrom = date('Ymd', strtotime($dateLastModifiedDateFrom));
+    $dateAvailable[] = $dateLastModifiedDateFrom;
+
+  }
+  if (!empty($dateOrderDateFrom)) {
+    $dateOrderDateFrom = date('Ymd', strtotime($dateOrderDateFrom));
+    $dateAvailable[] = $dateOrderDateFrom;
+  }
+  if ($params['use_last_sync_date']) {
+    $dateLastModifiedDateFrom = Civi::settings()->get('ultracampsync_last_sync_date');
+    if (empty($dateLastModifiedDateFrom) && !empty($dateLastModifiedDateFrom)) {
+      return civicrm_api3_create_error('Last sync date is not set.');
+    }
+    $dateLastModifiedDateFrom = date('Ymd', strtotime($dateLastModifiedDateFrom));
+  }
+
+  $currentDate = date('Ymd');
+
+  $ultracampsyncLastSyncDate = Civi::settings()->get('ultracampsync_last_sync_date');
 
   // Check if API credentials are configured
   $campId = Civi::settings()->get('ultracampsync_camp_id');
@@ -80,6 +115,20 @@ function civicrm_api3_job_Ultracamp($params) {
 
   if (empty($campId) || empty($campApiKey)) {
     return civicrm_api3_create_error('UltraCamp API credentials not configured.');
+  }
+
+  if ($params['delete_old'] !== 0 && !empty($params['delete_old'])) {
+    // Delete all locally recorded ultracamp that are older than 1 year
+    $oldUltraCampCount = \Civi\Api4\Ultracamp::get(FALSE)
+      ->selectRowCount()
+      ->addWhere('order_date', '<', $params['delete_old'])
+      ->execute()
+      ->count();
+    if (!empty($oldUltraCampCount)) {
+      \Civi\Api4\Ultracamp::delete(FALSE)
+        ->addWhere('order_date', '<', $params['delete_old'])
+        ->execute();
+    }
   }
 
   // Initialize UltraCamp client
@@ -91,7 +140,6 @@ function civicrm_api3_job_Ultracamp($params) {
     if (!empty($dateOrderDateFrom)) {
       $params['orderDateFrom'] = $dateOrderDateFrom;
     }
-
     $result = $client->getReservationDetails($params);
     $i = 0;
     $rowsImported = 0;
@@ -119,6 +167,8 @@ function civicrm_api3_job_Ultracamp($params) {
     $returnValues .= '<br/>Imported ' . $totalRows . ' number of rows';
     CRM_Core_Error::debug_log_message($returnValues);
     CRM_Core_Error::debug_log_message('Ultracamp import Completed');
+    Civi::settings()->set('ultracampsync_last_sync_date', $currentDate);
+    CRM_Core_Error::debug_log_message('Ultracamp Updated ultracampsync_last_sync_date to ' . $currentDate);
 
     return civicrm_api3_create_success($returnValues);
   }

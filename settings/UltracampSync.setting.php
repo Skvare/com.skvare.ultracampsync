@@ -38,4 +38,16 @@ return [
     'description' => E::ts('Custom Field for session id in event.'),
     'help_text' => E::ts('Custom Field for session id in event.'),
   ],
+  'ultracampsync_last_sync_date' => [
+    'group_name' => 'UltraCamp Sync Settings',
+    'group' => 'ultracampsync',
+    'name' => 'ultracampsync_last_sync_date',
+    'type' => 'String',
+    'default' => '',
+    'add' => '1.0',
+    'is_domain' => 1,
+    'is_contact' => 0,
+    'description' => E::ts('Last Sync date.'),
+    'help_text' => E::ts('Last Syn date'),
+  ],
 ];
