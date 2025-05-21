@@ -48,3 +48,26 @@ function ultracampsync_civicrm_navigationMenu(&$menu) {
 
   _ultracampsync_civix_navigationMenu($menu);
 }
+
+/**
+ * Implementation of hook_civicrm_customPre
+ */
+function ultracampsync_civicrm_customPre($op, $groupID, $entityID, $params) {
+  //  Ultracamp Date Custom Group.
+  if ($groupID == 11 && in_array($op, ['create', 'edit'])) {
+    $cfSessionID = CRM_Ultracampsync_Utils::getUltracampSessionIdCustomField(TRUE);
+    foreach ($params as $param) {
+      if ($param['custom_field_id'] == $cfSessionID && !empty($param['value'])) {
+        $params = [
+          'entityID' => $entityID,
+          'custom_' . $cfSessionID => 1,
+        ];
+        $values = CRM_Core_BAO_CustomValueTable::getValues($params);
+        if ($values['custom_' . $cfSessionID] != $param['value']) {
+          CRM_Ultracampsync_Utils::updateUltracampRecord($param['value']);
+        }
+      }
+    }
+  }
+}
+

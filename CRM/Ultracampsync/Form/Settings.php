@@ -13,7 +13,7 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
    * @throws \CRM_Core_Exception
    */
   public function buildQuickForm(): void {
-
+    // Set the form title
     $this->setTitle(E::ts('UltraCamp Sync Settings'));
 
     // API credentials section
@@ -25,10 +25,12 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     $eventCustomFields = $this->getEventCustomFields('Event');
     $contactCustomFields = $this->getEventCustomFields('Contact');
     $participantCustomFields = $this->getEventCustomFields('Participant');
+    $relationshiptCustomFields = $this->getEventCustomFields('Relationship');
     $this->add('select', 'session_id_field', E::ts('UltraCamp Session ID Field'), $eventCustomFields, FALSE);
     $this->add('select', 'person_id_field', E::ts('UltraCamp Person ID Field'), $contactCustomFields, FALSE);
     $this->add('select', 'account_id_field', E::ts('UltraCamp Account ID Field'), $contactCustomFields, FALSE);
     $this->add('select', 'reservation_id_field', E::ts('UltraCamp Reservation ID Field'), $participantCustomFields, FALSE);
+    $this->add('select', 'relationship_id_field', E::ts('UltraCamp Relationship Custom Field'), $relationshiptCustomFields, FALSE);
 
     $this->addButtons([
       [
@@ -59,6 +61,7 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     $defaults['person_id_field'] = Civi::settings()->get('ultracampsync_person_id_field');
     $defaults['account_id_field'] = Civi::settings()->get('ultracampsync_account_id_field');
     $defaults['reservation_id_field'] = Civi::settings()->get('ultracampsync_reservation_id_field');
+    $defaults['relationship_id_field'] = Civi::settings()->get('ultracampsync_relationship_id_field');
 
     return $defaults;
   }
@@ -73,6 +76,7 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     Civi::settings()->set('ultracampsync_person_id_field', $values['person_id_field']);
     Civi::settings()->set('ultracampsync_account_id_field', $values['account_id_field']);
     Civi::settings()->set('ultracampsync_reservation_id_field', $values['reservation_id_field']);
+    Civi::settings()->set('ultracampsync_relationship_id_field', $values['relationship_id_field']);
 
     CRM_Core_Session::setStatus(E::ts('Settings saved successfully.'), E::ts('Settings Saved'), 'success');
 

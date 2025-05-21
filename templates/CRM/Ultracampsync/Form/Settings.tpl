@@ -52,6 +52,14 @@
     <div class="clear"></div>
   </div>
 
+  <div class="crm-section">
+    <div class="label">{$form.relationship_id_field.label}</div>
+    <div class="content">{$form.relationship_id_field.html}
+      <div class="description">{ts}Custom Field for Relationship Name.{/ts}</div>
+    </div>
+    <div class="clear"></div>
+  </div>
+
 
   <div class="crm-submit-buttons">
     {include file="CRM/common/formButtons.tpl" location="bottom"}
