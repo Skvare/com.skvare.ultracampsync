@@ -10,6 +10,11 @@ use CRM_Ultracampsync_ExtensionUtil as E;
  * @see https://docs.civicrm.org/dev/en/latest/framework/api-architecture/
  */
 function _civicrm_api3_job_Ultracampbatchprocess_spec(&$spec) {
+  $spec['limit'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'limit',
+    'title' => 'Limit',
+  ];
 }
 
 /**
@@ -25,12 +30,14 @@ function _civicrm_api3_job_Ultracampbatchprocess_spec(&$spec) {
  * @throws API_Exception
  */
 function civicrm_api3_job_Ultracampbatchprocess($params) {
+  $limit = $params['limit'] ?? 100;
   // Get the settings from the config file.
   CRM_Core_Error::debug_log_message('Ultracampbatchprocess Start...');
   $session_id_field = Civi::settings()->get('ultracampsync_session_id_field');
   $person_id_field = Civi::settings()->get('ultracampsync_person_id_field');
   $account_id_field = Civi::settings()->get('ultracampsync_account_id_field');
   $reservation_id_field = Civi::settings()->get('ultracampsync_reservation_id_field');
+  $primary_contact_field = Civi::settings()->get('ultracampsync_primary_contact_field');
   $eventSessionList = CRM_Ultracampsync_Utils::getEventWithSessionId();
   // Init the variable
   $i = 0;
@@ -39,7 +46,7 @@ function civicrm_api3_job_Ultracampbatchprocess($params) {
   $personAccounts = [];
   $personImported = 0;
   // Prepare the query to fetch the data from the table.
-  $selectQuery = "select * from civicrm_ultracamp where status = 'new' ORDER BY id ASC limit 4";
+  $selectQuery = "select * from civicrm_ultracamp where status = 'new' ORDER BY id ASC limit {$limit}";
   $selectDAO = CRM_Core_DAO::executeQuery($selectQuery);
   // get relationship type mappign list.
   $relationshipTypeMapping = CRM_Ultracampsync_Utils::getRelationshipTypeMapping();
@@ -61,7 +68,10 @@ function civicrm_api3_job_Ultracampbatchprocess($params) {
     CRM_Ultracampsync_Utils::formatAddress($values);
     CRM_Core_Error::debug_log_message('Ultracampbatchprocess Contact');
     // Get/Created contact.
-    $contactID = CRM_Ultracampsync_Utils::handleContact($values, $person_id_field, $account_id_field);
+    $personsData['person_id_field'] = $person_id_field;
+    $personsData['account_id_field'] = $account_id_field;
+    $personsData['primary_contact_field'] = $primary_contact_field;
+    $contactID = CRM_Ultracampsync_Utils::handleContact($values);
     CRM_Core_Error::debug_log_message('Ultracampbatchprocess Contact created/get: ' . $contactID);
     if (!empty($contactID) && empty($values['contact_id'])) {
       // Update the contact id in the ultracamp table.
@@ -142,12 +152,16 @@ function civicrm_api3_job_Ultracampbatchprocess($params) {
           //CRM_Core_Error::debug_var('$personsData', $personsData);
           $personsData['PersonId'] = $personsData['Id'];
           CRM_Ultracampsync_Utils::formatAddress($personsData);
-          $personContactID = CRM_Ultracampsync_Utils::handleContact($personsData, $person_id_field, $account_id_field);
+          $personsData['person_id_field'] = $person_id_field;
+          $personsData['account_id_field'] = $account_id_field;
+          $personsData['primary_contact_field'] = $primary_contact_field;
+          $personContactID = CRM_Ultracampsync_Utils::handleContact($personsData);
           if (!empty($personContactID)) {
             $personImported++;
             $personsData['contact_id'] = $personContactID;
             if ($addressID) {
-              $personsData['master_id'] = $addressID;
+              // Use for Shared Address.
+              // $personsData['master_id'] = $addressID;
             }
             //CRM_Core_Error::debug_var('$personsData', $personsData);
             CRM_Ultracampsync_Utils::handleAddress($personsData);

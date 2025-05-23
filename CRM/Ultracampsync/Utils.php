@@ -14,22 +14,20 @@ class CRM_Ultracampsync_Utils {
 
   /**
    * @param $contactParams
-   * @param $cfPersonId
-   * @param $cfAccountId
    * @return mixed|null
    * @throws CRM_Core_Exception
    */
-  public static function handleContact($contactParams = [], $cfPersonId = NULL, $cfAccountId = NULL) {
+  public static function handleContact($contactParams = []) {
     if (!empty($contactParams['contact_id'])) {
       return $contactParams['contact_id'];
     }
     $personId = $contactParams['PersonId'];
     $contactID = NULL;
-    if (!empty($cfAccountId)) {
+    if (!empty($contactParams['person_id_field'])) {
       $get_params = [
         'sequential' => 1,
         'return' => ["id"],
-        'custom_' . $cfPersonId => $personId,
+        'custom_' . $contactParams['person_id_field'] => $personId,
       ];
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if ($contactResult['id']) {
@@ -67,11 +65,14 @@ class CRM_Ultracampsync_Utils {
     $newContactParam['middle_name'] = $contactParams['MiddleName'];
     $newContactParam['birth_date'] = $contactParams['BirthDate'];
     $newContactParam['gender_id'] = $contactParams['Gender'];
-    if (!empty($cfPersonId) && !empty($contactParams['PersonId'])) {
-      $newContactParam['custom_' . $cfPersonId] = $contactParams['PersonId'];
+    if (!empty($contactParams['person_id_field']) && !empty($contactParams['PersonId'])) {
+      $newContactParam['custom_' . $contactParams['person_id_field']] = $contactParams['PersonId'];
     }
-    if (!empty($cfAccountId) && !empty($contactParams['AccountId'])) {
-      $newContactParam['custom_' . $cfAccountId] = $contactParams['AccountId'];
+    if (!empty($contactParams['account_id_field']) && !empty($contactParams['AccountId'])) {
+      $newContactParam['custom_' . $contactParams['account_id_field']] = $contactParams['AccountId'];
+    }
+    if (!empty($contactParams['primary_contact_field']) && !empty($contactParams['PrimaryContact'])) {
+      $newContactParam['custom_' . $contactParams['primary_contact_field']] = 1;
     }
     try {
       $contactCreateResult = civicrm_api3('Contact', 'create', $newContactParam);
@@ -206,7 +207,7 @@ class CRM_Ultracampsync_Utils {
    */
   public static function handlePhone($phoneParams = []) {
     $id = $phoneParams['contact_id'];
-    if (!empty($phoneParams['PrimaryPhoneNumber'])) {
+    if (empty($phoneParams['PrimaryPhoneNumber'])) {
       return;
     }
     $phone_id = $id;
@@ -220,13 +221,26 @@ class CRM_Ultracampsync_Utils {
     else {
       $idtype = 'contact_id';
     }
+    // Check  phone type
+    if ($phoneParams['PrimaryPhoneType'] == 2) {
+      $phoneType = 7;
+      $locationType = 9;  // Cell Phone
+    }
+    elseif ($phoneParams['PrimaryPhoneType'] == 1) {
+      $phoneType = 'Work Phone';
+      $locationType = 2; // Day Phone
+    }
+    else {
+      $phone_type = 6; // Home Phone
+      $locationType = 1;
+    }
     try {
       $phone_params = [
         'version' => '3',
         $idtype => $phone_id,
-        'location_type_id' => '3', // Main
+        'location_type_id' => $locationType, // Main
         'is_primary' => '1',
-        'phone_type_id' => 1, //6, // Home Phone
+        'phone_type_id' => $phoneType,
         'phone' => $phoneParams['PrimaryPhoneNumber'],
       ];
       $civi_phone = civicrm_api3('Phone', 'create', $phone_params);
@@ -244,7 +258,7 @@ class CRM_Ultracampsync_Utils {
    * @throws CRM_Core_Exception
    */
   public static function handleEmail($emailParams = []) {
-    if (!empty($emailParams['Email'])) {
+    if (empty($emailParams['Email'])) {
       return;
     }
     $id = $emailParams['contact_id'];
@@ -263,7 +277,7 @@ class CRM_Ultracampsync_Utils {
       $email_params = [
         'version' => '3',
         $idtype => $email_id,
-        'location_type_id' => '3', // Main
+        'location_type_id' => '1', // Home
         'is_primary' => '1',
         'email' => $emailParams['Email'],
       ];
@@ -349,7 +363,7 @@ class CRM_Ultracampsync_Utils {
   public static function getUltracampSessionIdCustomGroup() {
     $result = civicrm_api3('CustomGroup', 'get', [
       'sequential' => 1,
-      'name' => 'ultracamp_data',
+      'name' => 'ultracamp_session_data',
     ]);
 
     if ($result['count'] > 0) {
@@ -367,7 +381,7 @@ class CRM_Ultracampsync_Utils {
   public static function getUltracampSessionIdCustomField($returnID = FALSE) {
     $result = civicrm_api3('CustomField', 'get', [
       'sequential' => 1,
-      'custom_group_id' => 'ultracamp_data',
+      'custom_group_id' => 'ultracamp_session_data',
       'name' => 'ultracamp_session_id',
     ]);
 
@@ -389,7 +403,7 @@ class CRM_Ultracampsync_Utils {
   public static function getLastSyncCustomField() {
     $result = civicrm_api3('CustomField', 'get', [
       'sequential' => 1,
-      'custom_group_id' => 'ultracamp_data',
+      'custom_group_id' => 'ultracamp_session_data',
       'name' => 'ultracamp_last_sync',
     ]);
 

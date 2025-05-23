@@ -18,17 +18,19 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
   public function install(): void {
     $this->installCustomGroupForEvent();
     $this->installCustomGroupForParticipant();
+    $this->installCustomGroupForRelationship();
+    $this->installCustomFieldForPrimaryContact();
   }
 
   public function installCustomGroupForEvent(): void {
     try {
       // Create custom group for Ultracamp data
       $customGroup = civicrm_api3('CustomGroup', 'create', [
-        'title' => "Ultracamp Data",
+        'title' => "Ultracamp Session",
         'extends' => "Event",
         'is_active' => 1,
         'is_reserved' => 0,
-        'name' => "ultracamp_data",
+        'name' => "ultracamp_session_data",
         'is_public' => 1,
       ]);
       $customGroupId = $customGroup['id'];
@@ -37,7 +39,7 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
       // If an exception is thrown, most likely the option group already exists,
       // in which case we'll just use that one.
       $customGroupId = civicrm_api3('CustomGroup', 'getvalue', [
-        'name' => 'ultracamp_data',
+        'name' => 'ultracamp_session_data',
         'return' => 'id',
       ]);
     }
@@ -100,6 +102,32 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
       CRM_Core_Error::debug_log_message('Failed to create custom fields: ' . $e->getMessage());
     }
   }
+
+  public function installCustomFieldForPrimaryContact(): void {
+    $customGroupId = civicrm_api3('CustomGroup', 'getvalue', [
+      'name' => 'UltraCamp',
+      'return' => 'id',
+    ]);
+
+    try {
+      // Create custom field for Ultracamp session ID
+      civicrm_api3('CustomField', 'create', [
+        'custom_group_id' => $customGroupId,
+        'label' => "Primary Contact",
+        'name' => "account_primary_contact",
+        'data_type' => "Boolean",
+        'html_type' => "Radio",
+        'is_active' => 1,
+        'is_searchable' => 1,
+        'is_view' => 0,
+        'is_required' => 0,
+      ]);
+    }
+    catch (Exception $e) {
+      CRM_Core_Error::debug_log_message('Failed to create custom fields: ' . $e->getMessage());
+    }
+  }
+
   /**
    * Example: Create custom group and fields for participant.
    *
@@ -194,7 +222,7 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
     }
   }
 
-
+  /*
   public function upgrade_1001(): bool {
     $this->ctx->log->info('Adding custom field for participant 1001');
     $this->installCustomGroupForParticipant();
@@ -202,10 +230,17 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
   }
 
   public function upgrade_1003(): bool {
-    $this->ctx->log->info('Adding custom field for relationship type 1002');
+    $this->ctx->log->info('Adding custom field for relationship type 1003');
     $this->installCustomGroupForRelationship();
     return TRUE;
   }
+
+  public function upgrade_1004(): bool {
+    $this->ctx->log->info('Adding custom field for primary contact 1004');
+    $this->installCustomFieldForPrimaryContact();
+    return TRUE;
+  }
+  */
 
   /**
    * Example: Work with entities usually not available during the install step.

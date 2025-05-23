@@ -45,6 +45,14 @@
   </div>
 
   <div class="crm-section">
+    <div class="label">{$form.primary_contact_field.label}</div>
+    <div class="content">{$form.primary_contact_field.html}
+      <div class="description">{ts}Custom Field for Primary Contact.{/ts}</div>
+    </div>
+    <div class="clear"></div>
+  </div>
+
+  <div class="crm-section">
     <div class="label">{$form.reservation_id_field.label}</div>
     <div class="content">{$form.reservation_id_field.html}
       <div class="description">{ts}Custom Field for Reservation ID.{/ts}</div>
