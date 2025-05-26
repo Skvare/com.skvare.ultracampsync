@@ -112,7 +112,7 @@ function civicrm_api3_job_Ultracampbatchprocess($params) {
   CRM_Core_Error::debug_var('$personAccounts', $personAccounts);
   // Get All person associated with account and create relationship if required.
   if (!empty($personAccounts)) {
-    $client = new CRM_UltracampSync_API_UltracampClient();
+    $client = new CRM_UltracampSync_Client();
     foreach ($personAccounts as $accountId) {
       $params = [
         'accountNumber' => $accountId,

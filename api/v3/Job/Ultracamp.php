@@ -133,7 +133,7 @@ function civicrm_api3_job_Ultracamp($params) {
 
   // Initialize UltraCamp client
   try {
-    $client = new CRM_UltracampSync_API_UltracampClient();
+    $client = new CRM_UltracampSync_Client();
     if (!empty($dateLastModifiedDateFrom)) {
       $params['lastModifiedDateFrom'] = $dateLastModifiedDateFrom;
     }

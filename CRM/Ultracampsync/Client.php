@@ -5,7 +5,7 @@ use CRM_UltracampSync_ExtensionUtil as E;
  * UltraCamp API Client
  * Manages communication with the UltraCamp REST API
  */
-class CRM_UltracampSync_API_UltracampClient {
+class CRM_UltracampSync_Client {
 
   protected $baseUrl = 'https://rest.ultracamp.com';
   protected $accessToken = NULL;

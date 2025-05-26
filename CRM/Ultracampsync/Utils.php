@@ -337,7 +337,7 @@ class CRM_Ultracampsync_Utils {
   protected function getUltracampPrograms() {
     $sessions = ['' => '- None -'];
     try {
-      $client = new CRM_UltracampSync_API_UltracampClient();
+      $client = new CRM_UltracampSync_Client();
       $sessionsList = $client->getSessions();
 
       if (!empty($sessionsList)) {
