@@ -19,20 +19,42 @@ class CRM_Ultracampsync_Utils {
    */
   public static function handleContact($contactParams = []) {
     if (!empty($contactParams['contact_id'])) {
-      return $contactParams['contact_id'];
+      //return $contactParams['contact_id'];
     }
     $personId = $contactParams['PersonId'];
     $contactID = NULL;
     if (!empty($contactParams['person_id_field'])) {
       $get_params = [
         'sequential' => 1,
-        'return' => ["id"],
+        'return' => ["id", 'first_name', 'last_name',
+          'custom_' . $contactParams['account_id_field'],
+          'custom_' . $contactParams['person_id_field']],
         'custom_' . $contactParams['person_id_field'] => $personId,
+        'contact_type' => 'Individual',
       ];
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if ($contactResult['id']) {
         $contactID = $contactResult['id'];
-        return $contactID;
+        $contactResultArray = reset($contactResult['values']);
+        if (!empty($contactParams['AccountId']) && !empty($contactResultArray['custom_' . $contactParams['account_id_field']])) {
+          CRM_Ultracampsync_Utils::logExtra('Contact found by Person ID: ' . $personId . ', contact ID: ' . $contactID);
+          return $contactID;
+          /*
+          // Update the account ID if it exists
+          $updateParams = [
+            'id' => $contactID,
+            'custom_' . $contactParams['account_id_field'] => $contactParams['AccountId'],
+          ];
+          try {
+            civicrm_api3('Contact', 'create', $updateParams);
+            CRM_Ultracampsync_Utils::log('Updated contact account ID: ' . $contactParams['AccountId'] . ' for contact ID: ' . $contactID);
+          }
+          catch (CRM_Core_Exception $e) {
+            CRM_Ultracampsync_Utils::log('Error updating contact account ID: ' . $e->getMessage());
+          }
+          */
+        }
+
       }
     }
     if (empty($contactID)) {
@@ -50,6 +72,7 @@ class CRM_Ultracampsync_Utils {
       ];
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if (!empty($contactResult['values']) && !empty($contactResult['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Contact found by name: ' . $contactParams['FirstName'] . ' ' . $contactParams['LastName'] . ', contact ID: ' . $contactResult['id']);
         $contactID = $contactResult['id'];
       }
     }
@@ -75,13 +98,15 @@ class CRM_Ultracampsync_Utils {
       $newContactParam['custom_' . $contactParams['primary_contact_field']] = 1;
     }
     try {
+      CRM_Ultracampsync_Utils::logExtra('Creating/updating contact with params: ' . print_r($newContactParam, TRUE));
       $contactCreateResult = civicrm_api3('Contact', 'create', $newContactParam);
       if (!empty($contactCreateResult['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Contact created/updated with ID: ' . $contactCreateResult['id']);
         $contactID = $contactCreateResult['id'];
       }
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Error creating/updating contact: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error creating/updating contact: ' . $e->getMessage());
     }
 
     return $contactID;
@@ -90,12 +115,12 @@ class CRM_Ultracampsync_Utils {
   /**
    * Handle household contact.
    *
-   * @param $contactParams
-   * @param $cfAccountId
+   * @param array $contactParams
+   * @param int|null $cfAccountId
    * @return mixed|null
    * @throws CRM_Core_Exception
    */
-  public static function handleHouseHoldContact($contactParams = [], $cfAccountId = NULL) {
+  public static function handleHouseHoldContact(array $contactParams = [], int $cfAccountId = NULL): mixed {
     $contactID = NULL;
     if (!empty($cfAccountId) && !empty($contactParams['AccountId'])) {
       $get_params = [
@@ -104,11 +129,11 @@ class CRM_Ultracampsync_Utils {
         'contact_type' => 'Household',
         'custom_' . $cfAccountId => $contactParams['AccountId'],
       ];
-
+      CRM_Ultracampsync_Utils::logExtra('Getting household contact by custom field: custom_' . $cfAccountId . ' with value: ' . $contactParams['AccountId']);
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if ($contactResult['id']) {
-        $contactID = $contactResult['id'];
-        return $contactID;
+        CRM_Ultracampsync_Utils::logExtra('Household contact found by custom field: custom_' . $cfAccountId . ' with value: ' . $contactParams['AccountId'] . ', contact ID: ' . $contactResult['id']);
+        return $contactResult['id'];
       }
     }
 
@@ -124,8 +149,10 @@ class CRM_Ultracampsync_Utils {
         'contact_type' => "Household",
         'options' => ['limit' => 1],
       ];
+      CRM_Ultracampsync_Utils::logExtra('Getting household contact by name: ' . $contactParams['AccountName'] . ', address: ' . $contactParams['Address'] . ', city: ' . $contactParams['City']);
       $contactResult = civicrm_api3('Contact', 'get', $get_params);
       if (!empty($contactResult['values']) && !empty($contactResult['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Household contact found by name: ' . $contactParams['AccountName'] . ', contact ID: ' . $contactResult['id']);
         $contactID = $contactResult['id'];
       }
     }
@@ -140,13 +167,15 @@ class CRM_Ultracampsync_Utils {
       $newContactParam['custom_' . $cfAccountId] = $contactParams['AccountId'];
     }
     try {
+      CRM_Ultracampsync_Utils::logExtra('Creating/updating household contact with params: ' . print_r($newContactParam, TRUE));
       $contactCreateResult = civicrm_api3('Contact', 'create', $newContactParam);
       if (!empty($contactCreateResult['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Household contact created/updated with ID: ' . $contactCreateResult['id']);
         $contactID = $contactCreateResult['id'];
       }
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Household: Error creating/updating contact: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Household: Error creating/updating contact: ' . $e->getMessage());
     }
     return $contactID;
   }
@@ -154,11 +183,11 @@ class CRM_Ultracampsync_Utils {
   /**
    * Handle contact address.
    *
-   * @param $addressParams
+   * @param array $addressParams
    * @return mixed|void
    * @throws CRM_Core_Exception
    */
-  public static function handleAddress($addressParams = []) {
+  public static function handleAddress(array $addressParams = []) {
     $id = $addressParams['contact_id'];
     $address_id = $id;
     $address_params = ['version' => 3, 'contact_id' => $addressParams['contact_id'], 'is_primary' => '1'];
@@ -166,6 +195,7 @@ class CRM_Ultracampsync_Utils {
     if ($existing_address['id']) {
       $idtype = 'id';
       $address_id = $existing_address['id'];
+      CRM_Ultracampsync_Utils::logExtra('Address found by contact ID: ' . $id . ', address ID: ' . $address_id);
       return $existing_address['id'];
     }
     else {
@@ -186,26 +216,27 @@ class CRM_Ultracampsync_Utils {
       if (!empty($addressParams['master_id'])) {
         $address_params['master_id'] = $addressParams['master_id'];
       }
+      CRM_Ultracampsync_Utils::logExtra('Creating/updating address with params: ' . print_r($address_params, TRUE));
       $civi_address = civicrm_api3('Address', 'create', $address_params);
       if ($civi_address['id']) {
+        CRM_Ultracampsync_Utils::logExtra('Address created/updated with ID: ' . $civi_address['id']);
         return $address_id;
       }
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Error creating/updating address: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error creating/updating address: ' . $e->getMessage());
     }
-    return;
   }
 
 
   /**
    * Handle contact phone.
    *
-   * @param $phoneParams
+   * @param array $phoneParams
    * @return void
    * @throws CRM_Core_Exception
    */
-  public static function handlePhone($phoneParams = []) {
+  public static function handlePhone(array $phoneParams = []): void {
     $id = $phoneParams['contact_id'];
     if (empty($phoneParams['PrimaryPhoneNumber'])) {
       return;
@@ -217,6 +248,7 @@ class CRM_Ultracampsync_Utils {
     if ($existing_phone['id']) {
       $idtype = 'id';
       $phone_id = $existing_phone['id'];
+      CRM_Ultracampsync_Utils::logExtra('Phone found by contact ID: ' . $id . ', phone ID: ' . $phone_id);
     }
     else {
       $idtype = 'contact_id';
@@ -231,7 +263,7 @@ class CRM_Ultracampsync_Utils {
       $locationType = 2; // Day Phone
     }
     else {
-      $phone_type = 6; // Home Phone
+      $phoneType = 6; // Home Phone
       $locationType = 1;
     }
     try {
@@ -243,21 +275,22 @@ class CRM_Ultracampsync_Utils {
         'phone_type_id' => $phoneType,
         'phone' => $phoneParams['PrimaryPhoneNumber'],
       ];
-      $civi_phone = civicrm_api3('Phone', 'create', $phone_params);
+      CRM_Ultracampsync_Utils::logExtra('Creating/updating phone with params: ' . print_r($phone_params, TRUE));
+      civicrm_api3('Phone', 'create', $phone_params);
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Error creating/updating phone: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error creating/updating phone: ' . $e->getMessage());
     }
   }
 
   /**
    * Handle contact Email.
    *
-   * @param $emailParams
+   * @param array $emailParams
    * @return void
    * @throws CRM_Core_Exception
    */
-  public static function handleEmail($emailParams = []) {
+  public static function handleEmail(array $emailParams = []): void {
     if (empty($emailParams['Email'])) {
       return;
     }
@@ -269,6 +302,7 @@ class CRM_Ultracampsync_Utils {
     if ($existing_phone['id']) {
       $idtype = 'id';
       $email_id = $existing_phone['id'];
+      CRM_Ultracampsync_Utils::logExtra('Email found by contact ID: ' . $id . ', email ID: ' . $email_id);
     }
     else {
       $idtype = 'contact_id';
@@ -281,52 +315,57 @@ class CRM_Ultracampsync_Utils {
         'is_primary' => '1',
         'email' => $emailParams['Email'],
       ];
-
+      CRM_Ultracampsync_Utils::logExtra('Creating/updating email with params: ' . print_r($email_params, TRUE));
       $civi_email = civicrm_api3('Email', 'create', $email_params);
+      if (!empty($civi_email['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Email created/updated with ID: ' . $civi_email['id']);
+      }
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Error creating/updating email: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error creating/updating email: ' . $e->getMessage());
     }
   }
 
   /**
    * Handle Participant.
    *
-   * @param $parcipantParams
-   * @param $reservation_id_field
-   * @return bool
+   * @param array $participantParams
+   * @param int $reservation_id_field
+   * @return string
    * @throws CRM_Core_Exception
    */
-  public static function handleParticipant($parcipantParams = [], $reservation_id_field) {
+  public static function handleParticipant(array $participantParams, int $reservation_id_field): string {
     // check if participants already exists.
     $params = [
-      'contact_id' => $parcipantParams['contact_id'],
-      'event_id' => $parcipantParams['event_id'],
-      'custom_' . $reservation_id_field => $parcipantParams['ReservationId'],
+      'contact_id' => $participantParams['contact_id'],
+      'event_id' => $participantParams['event_id'],
+      'custom_' . $reservation_id_field => $participantParams['ReservationId'],
     ];
-
+    CRM_Ultracampsync_Utils::logExtra('Checking for existing participant with params: ' . print_r($params, TRUE));
     $resultParticipant = civicrm_api3('Participant', 'get', $params);
     if (!empty($resultParticipant['values'])) {
-      return TRUE;
+      CRM_Ultracampsync_Utils::logExtra('Participant already exists for contact ID: ' . $participantParams['contact_id'] . ', event ID: ' . $participantParams['event_id']);
+      return 'exists'; // Participant already exists, no need to create again.
     }
     $params['status_id'] = 1;  // 5 = pending from pay later, 1 = registered
     $params['role_id'] = 1; // 1 = attendee
-    $params['source'] = 'Ultracamp Sync';
+    $params['source'] = 'Ultra camp Sync';
     if (!empty($reservation_id_field)) {
-      $params['custom_' . $reservation_id_field] = $parcipantParams['ReservationId'];
+      $params['custom_' . $reservation_id_field] = $participantParams['ReservationId'];
     }
-    $params['register_date'] = date("YmdHis", strtotime($parcipantParams['OrderDate']));
+    $params['register_date'] = date("YmdHis", strtotime($participantParams['OrderDate']));
     try {
       $participant = civicrm_api3('Participant', 'create', $params);
-      if (!empty($participant['id']) && !empty($parcipantParams['id'])) {
-        CRM_Core_DAO::setFieldValue('CRM_Ultracampsync_DAO_Ultracamp', $parcipantParams['id'], 'participant_id', $participant['id']);
+      if (!empty($participant['id']) && !empty($participantParams['id'])) {
+        CRM_Ultracampsync_Utils::logExtra('Participant created with ID: ' . $participant['id']);
+        CRM_Core_DAO::setFieldValue('CRM_Ultracampsync_DAO_Ultracamp', $participantParams['id'], 'participant_id', $participant['id']);
       }
     }
     catch (CRM_Core_Exception $e) {
-      CRM_Core_Error::debug_log_message('Error creating/updating participant: ' . $e->getMessage());
-      return FALSE;
+      CRM_Ultracampsync_Utils::log('Error creating/updating participant: ' . $e->getMessage());
+      return 'error';
     }
-    return TRUE;
+    return 'success';
   }
 
   /**
@@ -334,10 +373,10 @@ class CRM_Ultracampsync_Utils {
    *
    * @return array Array of programs
    */
-  protected function getUltracampPrograms() {
+  protected function getUltracampPrograms(): array {
     $sessions = ['' => '- None -'];
     try {
-      $client = new CRM_UltracampSync_Client();
+      $client = new CRM_Ultracampsync_API_UltracampClient();
       $sessionsList = $client->getSessions();
 
       if (!empty($sessionsList)) {
@@ -349,7 +388,7 @@ class CRM_Ultracampsync_Utils {
       }
     }
     catch (Exception $e) {
-      CRM_Core_Error::debug_log_message('Error getting UltraCamp session: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error getting UltraCamp session: ' . $e->getMessage());
     }
 
     return $sessions;
@@ -358,9 +397,10 @@ class CRM_Ultracampsync_Utils {
   /**
    * Get the custom field ID for Ultracamp Session ID
    *
-   * @return string
+   * @return string|null
+   * @throws CRM_Core_Exception
    */
-  public static function getUltracampSessionIdCustomGroup() {
+  public static function getUltracampSessionIdCustomGroup(): ?string {
     $result = civicrm_api3('CustomGroup', 'get', [
       'sequential' => 1,
       'name' => 'ultracamp_session_data',
@@ -378,7 +418,7 @@ class CRM_Ultracampsync_Utils {
    *
    * @return string
    */
-  public static function getUltracampSessionIdCustomField($returnID = FALSE) {
+  public static function getUltracampSessionIdCustomField($returnID = FALSE): ?string {
     $result = civicrm_api3('CustomField', 'get', [
       'sequential' => 1,
       'custom_group_id' => 'ultracamp_session_data',
@@ -400,7 +440,7 @@ class CRM_Ultracampsync_Utils {
    *
    * @return string
    */
-  public static function getLastSyncCustomField() {
+  public static function getLastSyncCustomField(): ?string {
     $result = civicrm_api3('CustomField', 'get', [
       'sequential' => 1,
       'custom_group_id' => 'ultracamp_session_data',
@@ -420,7 +460,7 @@ class CRM_Ultracampsync_Utils {
    * @param int $sessionId
    * @return array|null
    */
-  public static function getEventBySessionId($sessionId) {
+  public static function getEventBySessionId(int $sessionId): ?array {
     $sessionIdField = self::getUltracampSessionIdCustomField();
 
     if (!$sessionIdField) {
@@ -439,13 +479,17 @@ class CRM_Ultracampsync_Utils {
       }
     }
     catch (Exception $e) {
-      CRM_Core_Error::debug_log_message('Error finding event by session ID: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error finding event by session ID: ' . $e->getMessage());
     }
 
     return NULL;
   }
 
-  public static function getEventWithSessionId() {
+  /**
+   * Get all events with Ultracamp session ID
+   * @return array
+   */
+  public static function getEventWithSessionId(): array {
     $events = [];
     $cfSessionId = Civi::settings()->get('ultracampsync_session_id_field');
     try {
@@ -457,16 +501,18 @@ class CRM_Ultracampsync_Utils {
 
       if ($result['values'] > 0) {
         foreach ($result['values'] as $value) {
-          $sessionId = $value['custom_' . $cfSessionId];
-          if (!empty($sessionId)) {
-            $events[$sessionId] = $value['id'];
+          if (array_key_exists('custom_' . $cfSessionId, $value)) {
+            $sessionId = $value['custom_' . $cfSessionId];
+            if (!empty($sessionId)) {
+              $events[$sessionId] = $value['id'];
+            }
           }
         }
 
       }
     }
     catch (Exception $e) {
-      CRM_Core_Error::debug_log_message('Error finding event by session ID: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error finding event by session ID: ' . $e->getMessage());
     }
     return $events;
   }
@@ -474,7 +520,7 @@ class CRM_Ultracampsync_Utils {
   /**
    * Update last sync timestamp
    */
-  public static function updateLastSyncTimestamp() {
+  public static function updateLastSyncTimestamp(): string {
     $now = date('Y-m-d H:i:s');
     Civi::settings()->set('ultracampsync_last_sync', $now);
     return $now;
@@ -485,7 +531,7 @@ class CRM_Ultracampsync_Utils {
    *
    * @return int
    */
-  public static function getMappedEventsCount() {
+  public static function getMappedEventsCount(): int {
     $sessionIdField = self::getUltracampSessionIdCustomField();
 
     if (!$sessionIdField) {
@@ -500,7 +546,7 @@ class CRM_Ultracampsync_Utils {
       return $result;
     }
     catch (Exception $e) {
-      CRM_Core_Error::debug_log_message('Error counting mapped events: ' . $e->getMessage());
+      CRM_Ultracampsync_Utils::log('Error counting mapped events: ' . $e->getMessage());
       return 0;
     }
   }
@@ -511,16 +557,29 @@ class CRM_Ultracampsync_Utils {
    * @param string $message
    * @param string $level
    */
-  public static function log($message, $level = 'info') {
+  public static function log(string $message, string $level = 'info') {
     $logger = Civi::log();
     $logger->log($level, '[UltracampSync] ' . $message);
+  }
+
+  /**
+   * Log message to CiviCRM log
+   *
+   * @param string $message
+   * @param string $level
+   */
+  public static function logExtra(string $message, string $level = 'info') {
+    if (Civi::settings()->get('ultracampsync_debug_enable')) {
+      $logger = Civi::log();
+      $logger->log($level, '[UltracampSync] ' . $message);
+    }
   }
 
   public static function country() {
     $result = civicrm_api3('address', 'getoptions', ['field' => 'country_id']);
     $country = array_flip($result['values']);
     $country = array_change_key_case($country, CASE_LOWER);
-    // alternative country names (acutal name in english -> alternative names).
+    // alternative country names (actual name in english -> alternative names).
     $countryMatchingNames = [
       '1228' => ['United States', 'US', 'USA', 'United States Of America'],
       '1226' => ['United Kingdom', 'Great Britain', 'England', 'Scotland', 'Wales', 'Northern Ireland', 'Royaume-Uni'],
@@ -560,8 +619,7 @@ class CRM_Ultracampsync_Utils {
    * Function populate all state
    * @return array
    */
-  static function state() {
-    // @TODO Restrict to enabled counrty only
+  static function state(): array {
     $query = "SELECT id, name, abbreviation, country_id FROM `civicrm_state_province` ORDER BY `name` ASC";
     $dao = CRM_Core_DAO::executeQuery($query);
     $state = [];
@@ -578,7 +636,7 @@ class CRM_Ultracampsync_Utils {
    *
    * @return string[]
    */
-  public static function recordStatus() {
+  public static function recordStatus(): array {
     return [
       'new' => E::ts('New'),
       'error' => E::ts('Error'),
@@ -588,11 +646,11 @@ class CRM_Ultracampsync_Utils {
   }
 
   /**
-   * Relationshiop Type Mapping.
+   * Relationship Type Mapping.
    *
    * @return string[]
    */
-  public static function getRelationshipTypeMapping() {
+  public static function getRelationshipTypeMapping(): array {
     return [
       'Daughter' => '34', // Child of
       'Father/Husband' => '7',
@@ -600,20 +658,23 @@ class CRM_Ultracampsync_Utils {
       'Grandfather' => '35',
       'Grandmother' => '35',
       'Grandson' => '39',
-      'Individual Adult' => '',
+      'Individual Adult' => '41',
       'Mother/Wife' => '7',
       'Nephew' => '36',
       'Niece' => '36',
       'Non-Family' => '38',
       'Other Extended Family' => '41',
-      'Priest' => '',
-      'Religious' => '',
+      'Priest' => '41',
+      'Religious' => '41',
       'Son' => '34',
     ];
   }
 
-
-  public static function getRelationshipType($people) {
+  /**
+   * @param $people
+   * @return mixed|string
+   */
+  public static function getRelationshipType($people): mixed {
     $relationshipType = '';
     if (!empty($people['CustomQuestions'])) {
       foreach ($people['CustomQuestions'] as $customQuestion) {
@@ -622,6 +683,9 @@ class CRM_Ultracampsync_Utils {
           break;
         }
       }
+    }
+    if (empty($relationshipType)) {
+      $relationshipType = 'Other Extended Family'; // Default relationship type if not found
     }
     return $relationshipType;
   }
@@ -634,16 +698,24 @@ class CRM_Ultracampsync_Utils {
    * @param int $houseHoldContactID
    * @param int $relationshipTypeId
    * @param string $relationshipTypeFromUltraCamp
+   * @throws CRM_Core_Exception
    */
-  public static function handleRelationship($personContactID,
-                                            $houseHoldContactID,
-                                            $relationshipTypeId, $relationshipTypeFromUltraCamp) {
+  public static function handleRelationship(int    $personContactID,
+                                            int    $houseHoldContactID,
+                                            int    $relationshipTypeId,
+                                            string $relationshipTypeFromUltraCamp): void {
     $params = [
       'contact_id_a' => $personContactID,
       'contact_id_b' => $houseHoldContactID,
       'relationship_type_id' => $relationshipTypeId,
     ];
-    $result = civicrm_api3('Relationship', 'get', $params);
+    try {
+      $result = civicrm_api3('Relationship', 'get', $params);
+    }
+    catch (CRM_Core_Exception $e) {
+      CRM_Ultracampsync_Utils::log('Error checking relationship: ' . $e->getMessage());
+      $result = ['count' => 0, 'values' => []];
+    }
     if (empty($result['count'])) {
       $params['relationship_type_id'] = $relationshipTypeId;
       $params['contact_id_a'] = $personContactID;
@@ -656,11 +728,11 @@ class CRM_Ultracampsync_Utils {
         civicrm_api3('Relationship', 'create', $params);
       }
       catch (CRM_Core_Exception $e) {
-        CRM_Core_Error::debug_log_message('Error creating relationship: ' . $e->getMessage());
+        CRM_Ultracampsync_Utils::log('Error creating relationship: ' . $e->getMessage());
       }
     }
     else {
-      CRM_Core_Error::debug_log_message('handleRelationship: Relationship already exists.');
+      CRM_Ultracampsync_Utils::log('handleRelationship: Relationship already exists.');
     }
   }
 
@@ -670,11 +742,8 @@ class CRM_Ultracampsync_Utils {
    * @param array $peoples
    * @return array
    */
-  public static function getHouseHoldName($peoples) {
-    $primaryContact = [];
-    $secondoryContact = [];
-    $genderWiseContact = [];
-    $primaryAddress = [];
+  public static function getHouseHoldName(array $peoples): array {
+    $primaryContact = $secondaryContact = $genderWiseContact = $primaryAddress = [];
     $houseHoldName = '';
     foreach ($peoples as $people) {
       if (!empty($people['PrimaryContact'])) {
@@ -684,8 +753,8 @@ class CRM_Ultracampsync_Utils {
         $primaryAddress = $people;
       }
       if (!empty($people['SecondaryContact'])) {
-        $secondoryContact = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender'], 'peopleID' => $people['Id']];
-        $gender = $people['Gender'] ?? 'secondoryGender';
+        $secondaryContact = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender'], 'peopleID' => $people['Id']];
+        $gender = $people['Gender'] ?? 'secondaryGender';
         $genderWiseContact[$gender] = ['first_name' => $people['FirstName'], 'last_name' => $people['LastName'], 'gender' => $people['Gender']];
       }
     }
@@ -703,18 +772,18 @@ class CRM_Ultracampsync_Utils {
     If there is no secondary contact, then it is: "[PRIMARY LASTNAME], [PRIMARY FNAME] Family"
     If the gender of Primary or Secondary contact is unknown or they're the same, then household name is: "[PRIMARYCONTACT LASTNAME], [PRIMARYCONTACT FNAME] & [SECONDARYCONTACT FNAME] Family"
     */
-    if (!empty($primaryContact) && !empty($secondoryContact) &&
+    if (!empty($primaryContact) && !empty($secondaryContact) &&
       array_key_exists('Female', $genderWiseContact) && array_key_exists('Male', $genderWiseContact)) {
       $houseHoldName = $genderWiseContact['Male']['last_name'] . ' ' .
         $genderWiseContact['Male']['first_name'] . ' & ' .
         $genderWiseContact['Female']['first_name'] . ' Family';
     }
-    elseif (!empty($primaryContact) && !empty($secondoryContact) && count($genderWiseContact) == 1) {
+    elseif (!empty($primaryContact) && !empty($secondaryContact) && count($genderWiseContact) == 1) {
       $houseHoldName = $primaryContact['last_name'] . ' ' .
         $primaryContact['first_name'] . ' & ' .
-        $secondoryContact['first_name'] . ' Family';
+        $secondaryContact['first_name'] . ' Family';
     }
-    elseif (!empty($primaryContact) && empty($secondoryContact)) {
+    elseif (!empty($primaryContact) && empty($secondaryContact)) {
       $houseHoldName = $primaryContact['last_name'] . ' ' .
         $primaryContact['first_name'] . ' Family';
     }
@@ -725,9 +794,9 @@ class CRM_Ultracampsync_Utils {
    * Format address.
    *
    * @param array $values
-   * @return mixed
+   * @return array
    */
-  public static function formatAddress(&$values) {
+  public static function formatAddress(array &$values): array {
     if (NULL === self::$country) {
       self::$country = CRM_Ultracampsync_Utils::country();
     }
@@ -743,13 +812,13 @@ class CRM_Ultracampsync_Utils {
       'Country' => 'PersonCountry',
       'CountryID' => 'PersonCountryID',
     ];
-    if ($values['PersonCountry']) {
+    if (!empty($values['PersonCountry'])) {
       $values['PersonCountryID'] = self::$country[strtolower($values['PersonCountry'])];
       if (!empty($values['PersonState']) && !empty($values['PersonCountryID'])) {
         $values['PersonStateID'] = self::$state[$values['PersonCountryID']][strtolower($values['PersonState'])];
       }
     }
-    if ($values['Country']) {
+    if (!empty($values['Country'])) {
       $values['CountryID'] = self::$country[strtolower($values['Country'])];
       if (!empty($values['State']) && !empty($values['CountryID'])) {
         $values['StateID'] = self::$state[$values['CountryID']][strtolower($values['State'])];
@@ -763,7 +832,14 @@ class CRM_Ultracampsync_Utils {
     return $values;
   }
 
-  public static function updateUltracampRecord($sessionID) {
+  /**
+   * Update Ultracamp record status to 'new' for retry.
+   *
+   * @param int $sessionID
+   * @return void
+   * @throws \Civi\Core\Exception\DBQueryException
+   */
+  public static function updateUltracampRecord(int $sessionID): void {
     $updateQuery = "UPDATE `civicrm_ultracamp` SET `status` = 'new', message = 'retry' WHERE `status` = 'error' AND `session_id` = %1";
     CRM_Core_DAO::executeQuery($updateQuery, $params = [
       1 => [$sessionID, 'Integer'],

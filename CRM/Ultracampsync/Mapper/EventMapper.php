@@ -1,11 +1,11 @@
 <?php
-use CRM_UltracampSync_ExtensionUtil as E;
+use CRM_Ultracampsync_ExtensionUtil as E;
 
 /**
  * Event Mapper
  * Maps UltraCamp sessions to CiviCRM events
  */
-class CRM_UltracampSync_Mapper_EventMapper {
+class CRM_Ultracampsync_Mapper_EventMapper {
 
   /**
    * Map UltraCamp session to CiviCRM event format

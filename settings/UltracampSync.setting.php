@@ -1,5 +1,5 @@
 <?php
-use CRM_UltracampSync_ExtensionUtil as E;
+use CRM_Ultracampsync_ExtensionUtil as E;
 
 return [
   'ultracampsync_camp_id' => [

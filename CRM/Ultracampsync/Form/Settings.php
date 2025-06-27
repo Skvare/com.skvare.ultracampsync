@@ -25,15 +25,17 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     $eventCustomFields = $this->getEventCustomFields('Event');
     $contactCustomFields = $this->getEventCustomFields('Contact');
     $participantCustomFields = $this->getEventCustomFields('Participant');
-    $relationshiptCustomFields = $this->getEventCustomFields('Relationship');
+    $relationshipCustomFields = $this->getEventCustomFields('Relationship');
+    $eventCustomGroups = $this->getEventCustomGroup('Event');
     $this->add('select', 'session_id_field', E::ts('UltraCamp Session ID Field'), $eventCustomFields, TRUE);
     $this->add('select', 'person_id_field', E::ts('UltraCamp Person ID Field'), $contactCustomFields, TRUE);
     $this->add('select', 'account_id_field', E::ts('UltraCamp Account ID Field'), $contactCustomFields, TRUE);
     $this->add('select', 'primary_contact_field', E::ts('UltraCamp Primary Contact Field'), $contactCustomFields, TRUE);
 
     $this->add('select', 'reservation_id_field', E::ts('UltraCamp Reservation ID Field'), $participantCustomFields, FALSE);
-    $this->add('select', 'relationship_id_field', E::ts('UltraCamp Relationship Custom Field'), $relationshiptCustomFields, FALSE);
-
+    $this->add('select', 'relationship_id_field', E::ts('UltraCamp Relationship Custom Field'), $relationshipCustomFields, FALSE);
+    $this->add('select', 'event_cg_group_field', E::ts('UltraCamp Event Custom Group'), $eventCustomGroups, FALSE);
+    $this->add('advcheckbox', 'ultracampsync_debug_enable', ts('Debug Enabled?'));
     $this->addButtons([
       [
         'type' => 'submit',
@@ -66,6 +68,8 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
 
     $defaults['reservation_id_field'] = Civi::settings()->get('ultracampsync_reservation_id_field');
     $defaults['relationship_id_field'] = Civi::settings()->get('ultracampsync_relationship_id_field');
+    $defaults['event_cg_group_field'] = Civi::settings()->get('ultracampsync_event_cg_group_field');
+    $defaults['ultracampsync_debug_enable'] = Civi::settings()->get('ultracampsync_debug_enable');
 
     return $defaults;
   }
@@ -82,6 +86,8 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     Civi::settings()->set('ultracampsync_reservation_id_field', $values['reservation_id_field']);
     Civi::settings()->set('ultracampsync_relationship_id_field', $values['relationship_id_field']);
     Civi::settings()->set('ultracampsync_primary_contact_field', $values['primary_contact_field']);
+    Civi::settings()->set('ultracampsync_event_cg_group_field', $values['event_cg_group_field']);
+    Civi::settings()->set('ultracampsync_debug_enable', $values['ultracampsync_debug_enable']);
 
     CRM_Core_Session::setStatus(E::ts('Settings saved successfully.'), E::ts('Settings Saved'), 'success');
 
@@ -109,6 +115,27 @@ class CRM_Ultracampsync_Form_Settings extends CRM_Core_Form {
     return $elementNames;
   }
 
+  protected function getEventCustomGroup($entity = 'Event'): array {
+    $customGroupList = ['' => '- Select -'];
+    try {
+      // Get custom groups for events
+      $customGroups = civicrm_api3('CustomGroup', 'get', [
+        'extends' => $entity,
+        'is_active' => 1,
+      ]);
+
+      if ($customGroups['count'] > 0) {
+        foreach ($customGroups['values'] as $group) {
+          $customGroupList[$group['id']] = $group['title'];
+        }
+      }
+    }
+    catch (CiviCRM_API3_Exception $e) {
+      CRM_Core_Error::debug_log_message('Error getting custom group: ' . $e->getMessage());
+    }
+
+    return $customGroupList;
+  }
 
   /**
    * Get custom fields for events

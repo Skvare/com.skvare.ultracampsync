@@ -59,32 +59,36 @@ function _civicrm_api3_job_Ultracamp_spec(&$spec) {
  * @throws API_Exception
  */
 function civicrm_api3_job_Ultracamp($params) {
+  $dateOrderDateFrom = $dateLastModifiedDateFrom = '';
   // validate the period value.
-  $relativeDateLastModifiedDateFrom = explode('.', $params['last_modified_date_from'], 2);
-  if (count($relativeDateLastModifiedDateFrom) == 2) {
-    // convert relative date to actual date.
-    [$dateLastModifiedDateFrom, $to] = CRM_Utils_Date::getFromTo($params['last_modified_date_from'], '', '');
-    if (empty($dateLastModifiedDateFrom)) {
-      throw new API_Exception('Invalid relative date format', 'last_modified_date_from');
+  if (!empty($params['last_modified_date_from'])) {
+    $relativeDateLastModifiedDateFrom = explode('.', $params['last_modified_date_from'], 2);
+    if (count($relativeDateLastModifiedDateFrom) == 2) {
+      // convert relative date to actual date.
+      [$dateLastModifiedDateFrom, $to] = CRM_Utils_Date::getFromTo($params['last_modified_date_from'], '', '');
+      if (empty($dateLastModifiedDateFrom)) {
+        throw new API_Exception('Invalid relative date format', 'last_modified_date_from');
+      }
+    }
+    else {
+      $dateLastModifiedDateFrom = CRM_Utils_Array::value('last_modified_date_from', $params);
     }
   }
-  else {
-    $dateLastModifiedDateFrom = CRM_Utils_Array::value('last_modified_date_from', $params);
-  }
-
-  $relativeOrderDateFrom = explode('.', $params['order_date_from'], 2);
-  if (count($relativeOrderDateFrom) == 2) {
-    // convert relative date to actual date.
-    [$dateOrderDateFrom, $to] = CRM_Utils_Date::getFromTo($params['order_date_from'], '', '');
-    if (empty($dateOrderDateFrom)) {
-      throw new API_Exception('Invalid relative date format', 'order_date_from');
+  if (!empty($params['order_date_from'])) {
+    $relativeOrderDateFrom = explode('.', $params['order_date_from'], 2);
+    if (count($relativeOrderDateFrom) == 2) {
+      // convert relative date to actual date.
+      [$dateOrderDateFrom, $to] = CRM_Utils_Date::getFromTo($params['order_date_from'], '', '');
+      if (empty($dateOrderDateFrom)) {
+        throw new API_Exception('Invalid relative date format', 'order_date_from');
+      }
+    }
+    else {
+      $dateOrderDateFrom = CRM_Utils_Array::value('order_date_from', $params);
     }
   }
-  else {
-    $dateOrderDateFrom = CRM_Utils_Array::value('order_date_from', $params);
-  }
 
-  if (empty($dateLastModifiedDateFrom) && empty($dateOrderDateFrom)) {
+  if (empty($dateLastModifiedDateFrom) && empty($dateOrderDateFrom) && empty($params['use_last_sync_date'])) {
     return civicrm_api3_create_error('Last modified date or Order Date From date is required.');
   }
   $dateAvailable = [];
@@ -98,16 +102,15 @@ function civicrm_api3_job_Ultracamp($params) {
     $dateAvailable[] = $dateOrderDateFrom;
   }
   if ($params['use_last_sync_date']) {
-    $dateLastModifiedDateFrom = Civi::settings()->get('ultracampsync_last_sync_date');
-    if (empty($dateLastModifiedDateFrom) && !empty($dateLastModifiedDateFrom)) {
+    $lastSynDateFrom = Civi::settings()->get('ultracampsync_last_sync_date');
+    if (empty($lastSynDateFrom)) {
       return civicrm_api3_create_error('Last sync date is not set.');
     }
-    $dateLastModifiedDateFrom = date('Ymd', strtotime($dateLastModifiedDateFrom));
+    $dateOrderDateFrom = date('Ymd', strtotime($lastSynDateFrom));
+
   }
 
   $currentDate = date('Ymd');
-
-  $ultracampsyncLastSyncDate = Civi::settings()->get('ultracampsync_last_sync_date');
 
   // Check if API credentials are configured
   $campId = Civi::settings()->get('ultracampsync_camp_id');
@@ -133,7 +136,7 @@ function civicrm_api3_job_Ultracamp($params) {
 
   // Initialize UltraCamp client
   try {
-    $client = new CRM_UltracampSync_Client();
+    $client = new CRM_Ultracampsync_API_UltracampClient();
     if (!empty($dateLastModifiedDateFrom)) {
       $params['lastModifiedDateFrom'] = $dateLastModifiedDateFrom;
     }
@@ -148,7 +151,7 @@ function civicrm_api3_job_Ultracamp($params) {
       // reset count at 1000
       if ($i == 100) {
         $i = 0;
-        CRM_Core_Error::debug_var('Ultracamp Rows imported: ', $rowsImported . ' / ' . $datasource->maxRows);
+        CRM_Core_Error::debug_var('Ultracamp Rows imported: ', $rowsImported . ' / ' . $totalRows);
       }
       $i++;
       $rowsImported++;
@@ -163,8 +166,9 @@ function civicrm_api3_job_Ultracamp($params) {
       _insert_to_ultracamp_table($values);
     }
     // Set current date as last import date.
-    $returnValues = "Ultracamp Update details from " . $params['lastModifiedDateFrom'];
+    $returnValues = "Ultracamp Update details from " . print_r($params, TRUE);
     $returnValues .= '<br/>Imported ' . $totalRows . ' number of rows';
+    $returnValues .= '<br/>Set ultracampsync_last_sync_date to ' . $currentDate;
     CRM_Core_Error::debug_log_message($returnValues);
     CRM_Core_Error::debug_log_message('Ultracamp import Completed');
     Civi::settings()->set('ultracampsync_last_sync_date', $currentDate);

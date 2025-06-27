@@ -54,7 +54,8 @@ function ultracampsync_civicrm_navigationMenu(&$menu) {
  */
 function ultracampsync_civicrm_customPre($op, $groupID, $entityID, $params) {
   //  Ultracamp Date Custom Group.
-  if ($groupID == 11 && in_array($op, ['create', 'edit'])) {
+  $cgGroupID = Civi::settings()->get('ultracampsync_event_cg_group_field');
+  if (in_array($op, ['create', 'edit']) && $groupID == $cgGroupID) {
     $cfSessionID = CRM_Ultracampsync_Utils::getUltracampSessionIdCustomField(TRUE);
     foreach ($params as $param) {
       if ($param['custom_field_id'] == $cfSessionID && !empty($param['value'])) {
@@ -62,6 +63,7 @@ function ultracampsync_civicrm_customPre($op, $groupID, $entityID, $params) {
           'entityID' => $entityID,
           'custom_' . $cfSessionID => 1,
         ];
+        // get before value
         $values = CRM_Core_BAO_CustomValueTable::getValues($params);
         if ($values['custom_' . $cfSessionID] != $param['value']) {
           CRM_Ultracampsync_Utils::updateUltracampRecord($param['value']);

@@ -1,11 +1,11 @@
 <?php
-use CRM_UltracampSync_ExtensionUtil as E;
+use CRM_Ultracampsync_ExtensionUtil as E;
 
 /**
  * UltraCamp API Client
  * Manages communication with the UltraCamp REST API
  */
-class CRM_UltracampSync_Client {
+class CRM_Ultracampsync_API_UltracampClient {
 
   protected $baseUrl = 'https://rest.ultracamp.com';
   protected $accessToken = NULL;
@@ -167,7 +167,7 @@ class CRM_UltracampSync_Client {
     $responseData = json_decode($response, TRUE);
 
     if ($httpCode >= 400) {
-      $errorMessage = !empty($responseData['error']) ? $responseData['error'] : 'Unknown error';
+      $errorMessage = !empty($responseData['Message']) ? $responseData['Message'] : 'Unknown error';
       throw new CRM_Core_Exception("UltraCamp API error ({$httpCode}): {$errorMessage}");
     }
 

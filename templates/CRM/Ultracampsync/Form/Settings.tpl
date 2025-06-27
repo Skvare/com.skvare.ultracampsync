@@ -68,6 +68,22 @@
     <div class="clear"></div>
   </div>
 
+  <div class="crm-section">
+    <div class="label">{$form.event_cg_group_field.label}</div>
+    <div class="content">{$form.event_cg_group_field.html}
+      <div class="description">{ts}Custom Group for Event which have session id field.{/ts}</div>
+    </div>
+    <div class="clear"></div>
+  </div>
+
+  <div class="crm-section">
+    <div class="label">{$form.ultracampsync_debug_enable.label}</div>
+    <div class="content">{$form.ultracampsync_debug_enable.html}
+      <div class="description">{ts}Enabled logging into file.{/ts}</div>
+    </div>
+    <div class="clear"></div>
+  </div>
+
 
   <div class="crm-submit-buttons">
     {include file="CRM/common/formButtons.tpl" location="bottom"}
