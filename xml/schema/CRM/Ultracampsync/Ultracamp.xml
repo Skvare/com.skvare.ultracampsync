@@ -188,4 +188,17 @@
     <key>id</key>
     <onDelete>SET NULL</onDelete>
   </foreignKey>
+  <field>
+    <name>message_for_relelated_contact</name>
+    <title>Contact Message</title>
+    <type>varchar</type>
+    <length>1024</length>
+    <required>false</required>
+    <export>true</export>
+    <import>true</import>
+    <add>5.63</add>
+    <html>
+      <type>Text</type>
+    </html>
+  </field>
 </table>

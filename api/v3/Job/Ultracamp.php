@@ -23,6 +23,11 @@ function _civicrm_api3_job_Ultracamp_spec(&$spec) {
     'title' => 'Order Date From',
     //'api.default' => 'previous.day',
   ];
+  $spec['order_date_to'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'order_date_to',
+    'title' => 'Order Date To',
+  ];
 
   $spec['session_id'] = [
     'type' => CRM_Utils_Type::T_STRING,
@@ -56,7 +61,7 @@ function _civicrm_api3_job_Ultracamp_spec(&$spec) {
  *
  * @see civicrm_api3_create_success
  *
- * @throws API_Exception
+ * @throws CRM_Core_Exception
  */
 function civicrm_api3_job_Ultracamp($params) {
   $dateOrderDateFrom = $dateLastModifiedDateFrom = '';
@@ -67,7 +72,7 @@ function civicrm_api3_job_Ultracamp($params) {
       // convert relative date to actual date.
       [$dateLastModifiedDateFrom, $to] = CRM_Utils_Date::getFromTo($params['last_modified_date_from'], '', '');
       if (empty($dateLastModifiedDateFrom)) {
-        throw new API_Exception('Invalid relative date format', 'last_modified_date_from');
+        throw new CRM_Core_Exception('Invalid relative date format', 'last_modified_date_from');
       }
     }
     else {
@@ -80,7 +85,7 @@ function civicrm_api3_job_Ultracamp($params) {
       // convert relative date to actual date.
       [$dateOrderDateFrom, $to] = CRM_Utils_Date::getFromTo($params['order_date_from'], '', '');
       if (empty($dateOrderDateFrom)) {
-        throw new API_Exception('Invalid relative date format', 'order_date_from');
+        throw new CRM_Core_Exception('Invalid relative date format', 'order_date_from');
       }
     }
     else {
@@ -91,15 +96,12 @@ function civicrm_api3_job_Ultracamp($params) {
   if (empty($dateLastModifiedDateFrom) && empty($dateOrderDateFrom) && empty($params['use_last_sync_date'])) {
     return civicrm_api3_create_error('Last modified date or Order Date From date is required.');
   }
-  $dateAvailable = [];
+
   if (!empty($dateLastModifiedDateFrom)) {
     $dateLastModifiedDateFrom = date('Ymd', strtotime($dateLastModifiedDateFrom));
-    $dateAvailable[] = $dateLastModifiedDateFrom;
-
   }
   if (!empty($dateOrderDateFrom)) {
     $dateOrderDateFrom = date('Ymd', strtotime($dateOrderDateFrom));
-    $dateAvailable[] = $dateOrderDateFrom;
   }
   if ($params['use_last_sync_date']) {
     $lastSynDateFrom = Civi::settings()->get('ultracampsync_last_sync_date');
@@ -107,7 +109,6 @@ function civicrm_api3_job_Ultracamp($params) {
       return civicrm_api3_create_error('Last sync date is not set.');
     }
     $dateOrderDateFrom = date('Ymd', strtotime($lastSynDateFrom));
-
   }
 
   $currentDate = date('Ymd');

@@ -222,13 +222,18 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
     }
   }
 
-  /*
-  public function upgrade_1001(): bool {
-    $this->ctx->log->info('Adding custom field for participant 1001');
-    $this->installCustomGroupForParticipant();
+
+  public function upgrade_1005(): bool {
+    $this->ctx->log->info('Adding Message column for related contact');
+    if (!CRM_Core_BAO_SchemaHandler::checkIfFieldExists('civicrm_ultracamp', 'message_for_relelated_contact', FALSE)) {
+      $query = "ALTER TABLE `civicrm_ultracamp` ADD COLUMN `message_for_relelated_contact` varchar(1024) NULL COMMENT 'Message for related contact'";
+      CRM_Core_DAO::executeQuery($query, [], TRUE, NULL, FALSE, FALSE);
+    }
+
     return TRUE;
   }
 
+  /*
   public function upgrade_1003(): bool {
     $this->ctx->log->info('Adding custom field for relationship type 1003');
     $this->installCustomGroupForRelationship();

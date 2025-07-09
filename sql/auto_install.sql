@@ -48,6 +48,7 @@ CREATE TABLE `civicrm_ultracamp` (
   `data` text COMMENT 'Data.',
   `manual_contact_id` int unsigned COMMENT 'FK to Contact',
   `participant_id` int unsigned COMMENT 'FK to Participant',
+  `message_for_relelated_contact` varchar(1024) NULL,
   PRIMARY KEY (`id`),
   INDEX `index_person_id`(person_id),
   INDEX `index_session_name`(session_name),
