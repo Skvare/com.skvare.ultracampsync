@@ -226,7 +226,7 @@ class CRM_Ultracampsync_Upgrader extends CRM_Extension_Upgrader_Base {
   public function upgrade_1005(): bool {
     $this->ctx->log->info('Adding Message column for related contact');
     if (!CRM_Core_BAO_SchemaHandler::checkIfFieldExists('civicrm_ultracamp', 'message_for_relelated_contact', FALSE)) {
-      $query = "ALTER TABLE `civicrm_ultracamp` ADD COLUMN `message_for_relelated_contact` varchar(1024) NULL COMMENT 'Message for related contact'";
+      $query = "ALTER TABLE `civicrm_ultracamp` ADD COLUMN `message_for_relelated_contact` text COMMENT 'Message for related contact'";
       CRM_Core_DAO::executeQuery($query, [], TRUE, NULL, FALSE, FALSE);
     }
 

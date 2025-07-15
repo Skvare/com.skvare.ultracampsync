@@ -52,9 +52,19 @@ class CRM_Ultracampsync_BatchProcessor {
       $processedAccounts = $this->processRecords($records['values'], $params);
 
       // Process related account data
-      if (!empty($this->stats['successful'])) {
+      if (!empty($processedAccounts)) {
         CRM_Ultracampsync_Utils::log("Processing account relationships for " . count($processedAccounts) . " accounts");
         $this->processAccountRelationships($processedAccounts);
+      }
+      else {
+        CRM_Ultracampsync_Utils::log('No accounts to process for relationships');
+        if (!empty($records['values'][0]['id'])) {
+          $this->updateExtraRecordStatus(
+            $records['values'][0]['id'],
+            'warning',
+            'No accounts processed, skipping relationship processing'
+          );
+        }
       }
 
       return $this->completeProcessing();
@@ -112,12 +122,12 @@ class CRM_Ultracampsync_BatchProcessor {
    * @return array Records and count
    */
   protected function getRecordsToProcess($params) {
-    $whereConditions = ["status = 'new'"];
+    $whereConditions = ["status IN ('new', 'retry')"];
     $sqlParams = [];
     $paramIndex = 1;
 
     if (!empty($params['retry_errors'])) {
-      $whereConditions = ["status IN ('new', 'error')"];
+      $whereConditions = ["status IN ('new', 'retry', error')"];
     }
 
     if (!empty($params['session_id'])) {
@@ -165,20 +175,30 @@ class CRM_Ultracampsync_BatchProcessor {
         $this->stats['total_processed']++;
 
         $result = $this->processRecord($record);
-
         if ($result['success']) {
           $this->stats['successful']++;
           if (!empty($result['account_id'])) {
-            $processedAccounts[$result['account_id']] = $result['account_id'];
+            $processedAccounts[$result['account_id']] = $record['id'];
           }
 
           // Update record status
           $this->updateRecordStatus($record['id'], 'success', $result['message']);
+          $this->updateExtraRecordStatus(
+            $record['id'],
+            'success',
+            "Processed successfully: " . $result['message']
+          );
 
         }
         else {
           $this->stats['errors']++;
+          $processedAccounts[$result['account_id']] = $record['id'];
           $this->updateRecordStatus($record['id'], 'error', $result['message']);
+          $this->updateExtraRecordStatus(
+            $record['id'],
+            'error',
+            "Processing failed: " . $result['message']
+          );
         }
 
         $transaction->commit();
@@ -194,6 +214,11 @@ class CRM_Ultracampsync_BatchProcessor {
 
         CRM_Ultracampsync_Utils::log("Error processing record {$record['id']}: {$errorMessage}", 'error');
         $this->updateRecordStatus($record['id'], 'error', $errorMessage);
+        $this->updateExtraRecordStatus(
+          $record['id'],
+          'error',
+          "Processing failed: " . $errorMessage
+        );
       }
     }
 
@@ -215,6 +240,7 @@ class CRM_Ultracampsync_BatchProcessor {
       $this->stats['skipped']++;
       return [
         'success' => FALSE,
+        'account_id' => $values['account_id'] ?? NULL,
         'message' => 'Session ID not mapped to CiviCRM event: ' . $values['session_id']
       ];
     }
@@ -242,7 +268,11 @@ class CRM_Ultracampsync_BatchProcessor {
 
     // Handle participant creation
     $participantResult = $this->handleParticipant($values);
-
+    $this->updateExtraRecordStatus(
+      $record['id'],
+      $participantResult['success'] ? 'processing' : 'error',
+      $participantResult['message']
+    );
     if (!$participantResult['success']) {
       return $participantResult;
     }
@@ -269,6 +299,7 @@ class CRM_Ultracampsync_BatchProcessor {
       if (empty($contactId)) {
         return [
           'success' => FALSE,
+          'account_id' => $contactParams['account_id'] ?? NULL,
           'message' => 'Failed to create or find contact'
         ];
       }
@@ -285,6 +316,7 @@ class CRM_Ultracampsync_BatchProcessor {
       return [
         'success' => TRUE,
         'contact_id' => $contactId,
+        'account_id' => $contactParams['account_id'] ?? NULL,
         'created' => $isNew
       ];
 
@@ -292,6 +324,7 @@ class CRM_Ultracampsync_BatchProcessor {
     catch (Exception $e) {
       return [
         'success' => FALSE,
+        'account_id' => $contactParams['account_id'] ?? NULL,
         'message' => 'Contact handling failed: ' . $e->getMessage()
       ];
     }
@@ -316,21 +349,24 @@ class CRM_Ultracampsync_BatchProcessor {
           return [
             'success' => TRUE,
             'message' => 'Participant created successfully',
-            'created' => TRUE
+            'created' => TRUE,
+            'account_id' => $participantParams['account_id'] ?? NULL,
           ];
 
         case 'exists':
           $this->stats['skipped']++;
           return [
             'success' => FALSE,
-            'message' => 'Participant already exists'
+            'message' => 'Participant already exists',
+            'account_id' => $participantParams['account_id'] ?? NULL,
           ];
 
         case 'error':
         default:
           return [
             'success' => FALSE,
-            'message' => 'Failed to create participant'
+            'message' => 'Failed to create participant',
+            'account_id' => $participantParams['account_id'] ?? NULL,
           ];
       }
 
@@ -338,7 +374,8 @@ class CRM_Ultracampsync_BatchProcessor {
     catch (Exception $e) {
       return [
         'success' => FALSE,
-        'message' => 'Participant handling failed: ' . $e->getMessage()
+        'message' => 'Participant handling failed: ' . $e->getMessage(),
+        'account_id' => $participantParams['account_id'] ?? NULL,
       ];
     }
   }
@@ -362,8 +399,8 @@ class CRM_Ultracampsync_BatchProcessor {
 
       $client = new CRM_Ultracampsync_API_UltracampClient();
 
-      foreach ($accountIds as $accountId) {
-        $this->processAccountRelationship($accountId, $client);
+      foreach ($accountIds as $accountId => $recordID) {
+        $this->processAccountRelationship($accountId, $client, $recordID);
       }
 
     }
@@ -375,23 +412,39 @@ class CRM_Ultracampsync_BatchProcessor {
   /**
    * Process relationships for a single account
    *
-   * @param string $accountId
+   * @param $accountId
    * @param CRM_Ultracampsync_API_UltracampClient $client
+   * @param $recordID
+   * @return void
    */
-  protected function processAccountRelationship($accountId, $client) {
+  protected function processAccountRelationship($accountId, $client, $recordID) {
     $transaction = new CRM_Core_Transaction();
 
     try {
       CRM_Ultracampsync_Utils::logExtra("Processing relationships for account: {$accountId}");
-
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'processing',
+        "Processing relationships for account: {$accountId}"
+      );
       $params = ['accountNumber' => $accountId];
       $personsData = $client->getPeoples($params);
 
       if (empty($personsData)) {
         CRM_Ultracampsync_Utils::logExtra("No persons found for account: {$accountId}");
+        $this->updateExtraRecordStatus(
+          $recordID,
+          'warning',
+          "No persons found for account: {$accountId}"
+        );
         return;
       }
       else {
+        $this->updateExtraRecordStatus(
+          $recordID,
+          'processing',
+          count($personsData) . " persons found for account: {$accountId}"
+        );
         CRM_Ultracampsync_Utils::logExtra(count($personsData) . " persons found for account: {$accountId}");
       }
 
@@ -399,11 +452,21 @@ class CRM_Ultracampsync_BatchProcessor {
       $householdResult = $this->processHouseholdForAccount($personsData, $accountId);
 
       if ($householdResult['success']) {
+        $this->updateExtraRecordStatus($recordID, 'processing', 'Household created: ' . $householdResult['household_name']);
+        $personsNames = [];
         foreach ($personsData as $personData) {
-          CRM_Ultracampsync_Utils::logExtra("\t" . $personData['FirstName'] .
-            ' ' . $personData['LastName'] . ', contact ID: ' . $personData['Id']);
+          $personsNames[] = $personData['FirstName'] . ' ' . $personData['LastName'] . ', contact ID: ' . $personData['Id'];
         }
-        $this->processPersonRelationships($personsData, $householdResult['household_id']);
+        CRM_Ultracampsync_Utils::logExtra("Household created: {$householdResult['household_name']}, Now Check for these members: " . implode(', ', $personsNames));
+        $this->updateExtraRecordStatus(
+          $recordID,
+          'processing',
+          "Household created: {$householdResult['household_name']}, Now Check for these members: " . implode(', ', $personsNames)
+        );
+        $this->processPersonRelationships($personsData, $householdResult['household_id'], $recordID);
+      }
+      else {
+        $this->updateExtraRecordStatus($recordID, 'warning', $householdResult['message']);
       }
 
       $transaction->commit();
@@ -470,14 +533,20 @@ class CRM_Ultracampsync_BatchProcessor {
    *
    * @param array $personsData
    * @param int $householdId
+   * @param int $recordID
    */
-  protected function processPersonRelationships($personsData, $householdId) {
+  protected function processPersonRelationships($personsData, $householdId, $recordID) {
     foreach ($personsData as $personData) {
       try {
-        $this->processPersonRelationship($personData, $householdId);
+        $this->processPersonRelationship($personData, $householdId, $recordID);
       }
       catch (Exception $e) {
         CRM_Ultracampsync_Utils::log("Error processing person relationship: " . $e->getMessage(), 'error');
+        $this->updateExtraRecordStatus(
+          $recordID,
+          'error',
+          'Failed to process person relationship: ' . $e->getMessage()
+        );
       }
     }
   }
@@ -487,39 +556,99 @@ class CRM_Ultracampsync_BatchProcessor {
    *
    * @param array $personData
    * @param int $householdId
+   * @param int $recordID
    */
-  protected function processPersonRelationship($personData, $householdId) {
+  protected function processPersonRelationship($personData, $householdId, $recordID) {
     $personData['PersonId'] = $personData['Id'];
     CRM_Ultracampsync_Utils::formatAddress($personData);
 
     $personData = array_merge($personData, $this->config);
-    $personContactId = CRM_Ultracampsync_Utils::handleContact($personData);
+    try {
+      $personContactId = CRM_Ultracampsync_Utils::handleContact($personData);
+    }
+    catch (Exception $e) {
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to handle person contact: ' . $e->getMessage()
+      );
+      return;
+    }
     if (empty($personContactId)) {
-      CRM_Ultracampsync_Utils::log("Failed to get person contact for ID: " . $personData['Id']);
+      $this->UpdateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to create or find person contact ' . $personData['Id']
+      );
       return;
     }
 
     // Handle person address and contact info
     $personData['contact_id'] = $personContactId;
-    CRM_Ultracampsync_Utils::handleAddress($personData);
-    CRM_Ultracampsync_Utils::handlePhone($personData);
-    CRM_Ultracampsync_Utils::handleEmail($personData);
+    try {
+      CRM_Ultracampsync_Utils::handleAddress($personData);
+    }
+    catch (Exception $e) {
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to handle person address: ' . $e->getMessage()
+      );
+    }
+    try {
+      CRM_Ultracampsync_Utils::handlePhone($personData);
+    }
+    catch (Exception $e) {
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to handle person phone: ' . $e->getMessage()
+      );
+    }
+
+    try {
+      CRM_Ultracampsync_Utils::handleEmail($personData);
+    }
+    catch (Exception $e) {
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to handle person email: ' . $e->getMessage()
+      );
+    }
 
     // Process relationship
     $relationshipType = CRM_Ultracampsync_Utils::getRelationshipType($personData);
 
     if (empty($relationshipType) || !array_key_exists($relationshipType, $this->relationshipTypeMapping)) {
       CRM_Ultracampsync_Utils::logExtra("Unknown or unmapped relationship type: " . $relationshipType);
-      return;
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'warning',
+        "Unknown or unmapped relationship type: {$relationshipType}, using default 'Other Extended Family'"
+      );
+      // Set Default relationship type if not found.
+      $relationshipType = 'Other Extended Family';
     }
 
     $relationshipTypeId = $this->relationshipTypeMapping[$relationshipType];
-    CRM_Ultracampsync_Utils::handleRelationship(
-      $personContactId,
-      $householdId,
-      $relationshipTypeId,
-      $relationshipType
-    );
+    try {
+      CRM_Ultracampsync_Utils::handleRelationship(
+        $personContactId,
+        $householdId,
+        $relationshipTypeId,
+        $relationshipType
+      );
+    }
+    catch (Exception $e) {
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'error',
+        'Failed to create relationship: ' . $e->getMessage()
+      );
+      CRM_Ultracampsync_Utils::log("Failed to create relationship for person ID {$personData['Id']}: " . $e->getMessage(), 'error');
+      return;
+    }
 
     $this->stats['relationships_created']++;
   }
@@ -573,6 +702,28 @@ class CRM_Ultracampsync_BatchProcessor {
       3 => [$recordId, 'Integer']
     ];
 
+    CRM_Core_DAO::executeQuery($updateQuery, $params);
+  }
+
+  /**
+   * Update record status in database
+   *
+   * @param int $recordId
+   * @param string $status
+   * @param string $message
+   */
+  protected function updateExtraRecordStatus($recordId, $status, $message = NULL) {
+    // Get message_for_relelated_contact and append to existing message.
+    $existingMessage = CRM_Core_DAO::getFieldValue('CRM_Ultracampsync_DAO_Ultracamp', $recordId, 'message_for_relelated_contact', 'id');
+    if (!empty($existingMessage)) {
+      $message = $existingMessage . '::' . $message;
+    }
+    $updateQuery = "UPDATE civicrm_ultracamp SET message_for_relelated_contact = %2 WHERE id = %3";
+    $params = [
+      //1 => [$status, 'String'],
+      2 => [$message, 'String'],
+      3 => [$recordId, 'Integer']
+    ];
     CRM_Core_DAO::executeQuery($updateQuery, $params);
   }
 

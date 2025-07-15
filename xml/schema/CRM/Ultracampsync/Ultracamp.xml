@@ -191,14 +191,14 @@
   <field>
     <name>message_for_relelated_contact</name>
     <title>Contact Message</title>
-    <type>varchar</type>
-    <length>1024</length>
-    <required>false</required>
-    <export>true</export>
+    <type>text</type>
+    <comment>Contact Message.</comment>
+    <html>
+      <type>TextArea</type>
+      <rows>4</rows>
+      <cols>60</cols>
+    </html>
     <import>true</import>
     <add>5.63</add>
-    <html>
-      <type>Text</type>
-    </html>
   </field>
 </table>

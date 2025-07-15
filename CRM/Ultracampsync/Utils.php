@@ -388,7 +388,7 @@ class CRM_Ultracampsync_Utils {
       if (!empty($addressParams['master_id'])) {
         $address_params['master_id'] = $addressParams['master_id'];
       }
-      CRM_Ultracampsync_Utils::logExtra('Creating/updating address with params: ' . print_r($address_params, TRUE));
+      //CRM_Ultracampsync_Utils::logExtra('Creating/updating address with params: ' . print_r($address_params, TRUE));
       $civi_address = civicrm_api3('Address', 'create', $address_params);
       if ($civi_address['id']) {
         CRM_Ultracampsync_Utils::logExtra('Address created/updated with ID: ' . $civi_address['id']);
@@ -397,6 +397,7 @@ class CRM_Ultracampsync_Utils {
     }
     catch (CRM_Core_Exception $e) {
       CRM_Ultracampsync_Utils::log('Error creating/updating address: ' . $e->getMessage());
+      throw $e;
     }
   }
 
@@ -447,11 +448,11 @@ class CRM_Ultracampsync_Utils {
         'phone_type_id' => $phoneType,
         'phone' => $phoneParams['PrimaryPhoneNumber'],
       ];
-      CRM_Ultracampsync_Utils::logExtra('Creating/updating phone with params: ' . print_r($phone_params, TRUE));
       civicrm_api3('Phone', 'create', $phone_params);
     }
     catch (CRM_Core_Exception $e) {
       CRM_Ultracampsync_Utils::log('Error creating/updating phone: ' . $e->getMessage());
+      throw $e;
     }
   }
 
@@ -487,7 +488,6 @@ class CRM_Ultracampsync_Utils {
         'is_primary' => '1',
         'email' => $emailParams['Email'],
       ];
-      CRM_Ultracampsync_Utils::logExtra('Creating/updating email with params: ' . print_r($email_params, TRUE));
       $civi_email = civicrm_api3('Email', 'create', $email_params);
       if (!empty($civi_email['id'])) {
         CRM_Ultracampsync_Utils::logExtra('Email created/updated with ID: ' . $civi_email['id']);
@@ -495,6 +495,7 @@ class CRM_Ultracampsync_Utils {
     }
     catch (CRM_Core_Exception $e) {
       CRM_Ultracampsync_Utils::log('Error creating/updating email: ' . $e->getMessage());
+      throw $e;
     }
   }
 
@@ -654,7 +655,7 @@ class CRM_Ultracampsync_Utils {
         'event_id' => $participantParams['event_id'],
         'custom_' . $reservation_id_field => $participantParams['ReservationId'],
       ];
-      CRM_Ultracampsync_Utils::logExtra('Checking for existing participant with params: ' . print_r($params, TRUE));
+      // CRM_Ultracampsync_Utils::logExtra('Checking for existing participant with params: ' . print_r($params, TRUE));
       $resultParticipant = civicrm_api3('Participant', 'get', $params);
       if (!empty($resultParticipant['values'])) {
         CRM_Ultracampsync_Utils::logExtra('Participant already exists for contact ID: ' . $participantParams['contact_id'] . ', event ID: ' . $participantParams['event_id']);
@@ -959,6 +960,7 @@ class CRM_Ultracampsync_Utils {
       'error' => E::ts('Error'),
       'success' => E::ts('Success'),
       'processing' => E::ts('Processing'),
+      'retry' => E::ts('Retry'),
     ];
   }
 
