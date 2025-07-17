@@ -35,6 +35,7 @@ class CRM_Ultracampsync_BatchProcessor {
     $this->stats['start_time'] = microtime(TRUE);
     $this->initializeConfig();
     $this->validateParams($params);
+    $this->validateRelationship();
 
     try {
       CRM_Ultracampsync_Utils::log('Enhanced batch processing started with params: ' . print_r($params, TRUE));
@@ -116,6 +117,23 @@ class CRM_Ultracampsync_BatchProcessor {
   }
 
   /**
+   * Validate Relationship before processing.
+   *
+   * @return void
+   * @throws CRM_Core_Exception
+   */
+  protected function validateRelationship() {
+    // Relationship Types from CiviCRM
+    $relationshipTypes = CRM_Core_PseudoConstant::relationshipType();
+    // Check CiviCRM relationship types are active and available.
+    foreach ($this->relationshipTypeMapping as $type => $id) {
+      if (!array_key_exists($id, $relationshipTypes)) {
+        throw new CRM_Core_Exception("Ultracamp Relationship type '{$type}' with CiviCRM Relationship ID '{$id}' is not active or does not exist in CiviCRM.");
+      }
+    }
+  }
+
+  /**
    * Get records to process based on parameters
    *
    * @param array $params
@@ -155,7 +173,7 @@ class CRM_Ultracampsync_BatchProcessor {
     return [
       'count' => $totalCount,
       'batch_size' => count($records),
-      'values' => $records
+      'values' => $records,
     ];
   }
 
@@ -241,7 +259,7 @@ class CRM_Ultracampsync_BatchProcessor {
       return [
         'success' => FALSE,
         'account_id' => $values['account_id'] ?? NULL,
-        'message' => 'Session ID not mapped to CiviCRM event: ' . $values['session_id']
+        'message' => 'Session ID not mapped to CiviCRM event: ' . $values['session_id'],
       ];
     }
 
@@ -282,7 +300,7 @@ class CRM_Ultracampsync_BatchProcessor {
       'message' => $participantResult['message'],
       'contact_id' => $contactId,
       'account_id' => $values['account_id'] ?? NULL,
-      'participant_created' => $participantResult['created']
+      'participant_created' => $participantResult['created'],
     ];
   }
 
@@ -300,7 +318,7 @@ class CRM_Ultracampsync_BatchProcessor {
         return [
           'success' => FALSE,
           'account_id' => $contactParams['account_id'] ?? NULL,
-          'message' => 'Failed to create or find contact'
+          'message' => 'Failed to create or find contact',
         ];
       }
 
@@ -317,7 +335,7 @@ class CRM_Ultracampsync_BatchProcessor {
         'success' => TRUE,
         'contact_id' => $contactId,
         'account_id' => $contactParams['account_id'] ?? NULL,
-        'created' => $isNew
+        'created' => $isNew,
       ];
 
     }
@@ -325,7 +343,7 @@ class CRM_Ultracampsync_BatchProcessor {
       return [
         'success' => FALSE,
         'account_id' => $contactParams['account_id'] ?? NULL,
-        'message' => 'Contact handling failed: ' . $e->getMessage()
+        'message' => 'Contact handling failed: ' . $e->getMessage(),
       ];
     }
   }
@@ -516,14 +534,14 @@ class CRM_Ultracampsync_BatchProcessor {
       return [
         'success' => TRUE,
         'household_id' => $householdId,
-        'household_name' => $householdName
+        'household_name' => $householdName,
       ];
 
     }
     catch (Exception $e) {
       return [
         'success' => FALSE,
-        'message' => 'Household processing failed: ' . $e->getMessage()
+        'message' => 'Household processing failed: ' . $e->getMessage(),
       ];
     }
   }
@@ -699,7 +717,7 @@ class CRM_Ultracampsync_BatchProcessor {
     $params = [
       1 => [$status, 'String'],
       2 => [$message, 'String'],
-      3 => [$recordId, 'Integer']
+      3 => [$recordId, 'Integer'],
     ];
 
     CRM_Core_DAO::executeQuery($updateQuery, $params);
@@ -722,7 +740,7 @@ class CRM_Ultracampsync_BatchProcessor {
     $params = [
       //1 => [$status, 'String'],
       2 => [$message, 'String'],
-      3 => [$recordId, 'Integer']
+      3 => [$recordId, 'Integer'],
     ];
     CRM_Core_DAO::executeQuery($updateQuery, $params);
   }
@@ -742,7 +760,7 @@ class CRM_Ultracampsync_BatchProcessor {
       'current' => $current,
       'total' => $total,
       'percentage' => round(($current / $total) * 100, 2),
-      'stats' => $this->stats
+      'stats' => $this->stats,
     ];
 
     // Send async HTTP request (implement as needed)
@@ -788,7 +806,7 @@ class CRM_Ultracampsync_BatchProcessor {
 
     $result = array_merge([
       'message' => $message,
-      'stats' => $this->stats
+      'stats' => $this->stats,
     ], $additionalData);
 
     return civicrm_api3_create_success([$result], [], 'Job', 'Ultracampbatchprocess');

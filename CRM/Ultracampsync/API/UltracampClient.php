@@ -226,7 +226,7 @@ class CRM_Ultracampsync_API_UltracampClient {
       throw new CRM_Core_Exception("UltraCamp API request failed: {$error}");
     }
 
-    $responseData = json_decode($response, TRUE);
+    $responseData = json_decode($response, TRUE) ?: [];
 
     if ($httpCode >= 400) {
       $errorMessage = !empty($responseData['Message']) ? $responseData['Message'] : 'Unknown error';
@@ -429,7 +429,7 @@ class CRM_Ultracampsync_API_UltracampClient {
     }
 
     // Split headers and body
-    $responseData = json_decode($response, TRUE);
+    $responseData = json_decode($response, TRUE) ?: [];
 
     return [
       'status_code' => $httpCode,
