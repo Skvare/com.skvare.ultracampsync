@@ -23,6 +23,7 @@ class CRM_Ultracampsync_BatchProcessor {
   protected $eventSessionList = [];
   protected $relationshipTypeMapping = [];
   protected $progressCallback = NULL;
+  protected $activeRelationshipTypes = [];
 
   /**
    * Process batch of UltraCamp records
@@ -125,6 +126,7 @@ class CRM_Ultracampsync_BatchProcessor {
   protected function validateRelationship() {
     // Relationship Types from CiviCRM
     $relationshipTypes = CRM_Core_PseudoConstant::relationshipType();
+    $this->activeRelationshipTypes = array_keys($relationshipTypes);
     // Check CiviCRM relationship types are active and available.
     foreach ($this->relationshipTypeMapping as $type => $id) {
       if (!array_key_exists($id, $relationshipTypes)) {
@@ -481,14 +483,14 @@ class CRM_Ultracampsync_BatchProcessor {
           'processing',
           "Household created: {$householdResult['household_name']}, Now Check for these members: " . implode(', ', $personsNames)
         );
-        $this->processPersonRelationships($personsData, $householdResult['household_id'], $recordID);
       }
       else {
         $this->updateExtraRecordStatus($recordID, 'warning', $householdResult['message']);
       }
 
-      $transaction->commit();
+      $this->processPersonRelationships($personsData, $householdResult['household_id'] ?? NULL, $recordID);
 
+      $transaction->commit();
     }
     catch (Exception $e) {
       $transaction->rollback();
@@ -550,7 +552,7 @@ class CRM_Ultracampsync_BatchProcessor {
    * Process person relationships for household
    *
    * @param array $personsData
-   * @param int $householdId
+   * @param int|null $householdId
    * @param int $recordID
    */
   protected function processPersonRelationships($personsData, $householdId, $recordID) {
@@ -573,7 +575,7 @@ class CRM_Ultracampsync_BatchProcessor {
    * Process relationship for individual person
    *
    * @param array $personData
-   * @param int $householdId
+   * @param int|null $householdId
    * @param int $recordID
    */
   protected function processPersonRelationship($personData, $householdId, $recordID) {
@@ -635,6 +637,16 @@ class CRM_Ultracampsync_BatchProcessor {
       );
     }
 
+    if (empty($householdId)) {
+      CRM_Ultracampsync_Utils::logExtra("No household ID provided for person ID {$personData['Id']}, skipping relationship creation");
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'warning',
+        "No household ID provided for person ID {$personData['Id']}, skipping relationship creation"
+      );
+      return;
+    }
+
     // Process relationship
     $relationshipType = CRM_Ultracampsync_Utils::getRelationshipType($personData);
 
@@ -650,6 +662,16 @@ class CRM_Ultracampsync_BatchProcessor {
     }
 
     $relationshipTypeId = $this->relationshipTypeMapping[$relationshipType];
+    if (!empty($relationshipTypeId) && !in_array($relationshipTypeId, $this->activeRelationshipTypes)) {
+      CRM_Ultracampsync_Utils::logExtra("Inactive relationship type: {$relationshipType}");
+      $this->updateExtraRecordStatus(
+        $recordID,
+        'warning',
+        "Inactive relationship type: {$relationshipType}, skipping relationship creation"
+      );
+      // Set Default relationship type if not found.
+      $relationshipType = 'Other Extended Family';
+    }
     try {
       CRM_Ultracampsync_Utils::handleRelationship(
         $personContactId,
