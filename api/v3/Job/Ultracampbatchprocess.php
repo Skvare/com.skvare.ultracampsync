@@ -26,6 +26,12 @@ function _civicrm_api3_job_Ultracampbatchprocess_spec(&$spec) {
     'api.default' => FALSE,
   ];
 
+  $spec['order_date_from'] = [
+    'type' => CRM_Utils_Type::T_STRING,
+    'name' => 'order_date_from',
+    'title' => 'Order Date From',
+  ];
+
   $spec['session_id'] = [
     'type' => CRM_Utils_Type::T_INT,
     'name' => 'session_id',

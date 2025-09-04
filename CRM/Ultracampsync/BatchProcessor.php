@@ -1,5 +1,5 @@
 <?php
-
+require_once 'api/v3/Job/Ultracamp.php';
 /**
  * Enhanced Batch Processor Class
  */
@@ -147,7 +147,15 @@ class CRM_Ultracampsync_BatchProcessor {
     $paramIndex = 1;
 
     if (!empty($params['retry_errors'])) {
-      $whereConditions = ["status IN ('new', 'retry', error')"];
+      $whereConditions = ["status IN ('new', 'retry', 'error')"];
+    }
+    if (!empty($params['order_date_from'])) {
+      $orderDateFrom = _processDateInput($params['order_date_from'], 'order_date');
+      if ($orderDateFrom) {
+        $whereConditions['order_date'] = 'order_date >= %' . $paramIndex;
+        $sqlParams[$paramIndex] = [$orderDateFrom, 'String'];
+        $paramIndex++;
+      }
     }
 
     if (!empty($params['session_id'])) {
