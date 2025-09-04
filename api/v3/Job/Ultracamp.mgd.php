@@ -14,7 +14,6 @@ return [
       'run_frequency' => 'Daily',
       'api_entity' => 'Job',
       'api_action' => 'Ultracamp',
-      'parameters' => '',
     ],
   ],
 ];
