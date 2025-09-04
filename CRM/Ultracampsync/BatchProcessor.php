@@ -130,7 +130,7 @@ class CRM_Ultracampsync_BatchProcessor {
     // Check CiviCRM relationship types are active and available.
     foreach ($this->relationshipTypeMapping as $type => $id) {
       if (!array_key_exists($id, $relationshipTypes)) {
-        throw new CRM_Core_Exception("Ultracamp Relationship type '{$type}' with CiviCRM Relationship ID '{$id}' is not active or does not exist in CiviCRM.");
+        CRM_Ultracampsync_Utils::log("Ultracamp Relationship type '{$type}' with CiviCRM Relationship ID '{$id}' is not active or does not exist in CiviCRM.");
       }
     }
   }
@@ -661,7 +661,7 @@ class CRM_Ultracampsync_BatchProcessor {
       $relationshipType = 'Other Extended Family';
     }
 
-    $relationshipTypeId = $this->relationshipTypeMapping[$relationshipType];
+    $relationshipTypeId = $this->relationshipTypeMapping[$relationshipType] ?? '';
     if (!empty($relationshipTypeId) && !in_array($relationshipTypeId, $this->activeRelationshipTypes)) {
       CRM_Ultracampsync_Utils::logExtra("Inactive relationship type: {$relationshipType}");
       $this->updateExtraRecordStatus(
